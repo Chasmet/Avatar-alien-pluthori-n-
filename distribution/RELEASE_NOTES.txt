@@ -1,6 +1,4 @@
-CHK Alien Live 0.6.8
-- Déformation par maillage facial, lèvres et mâchoire plus réactives
-- Suivi facial ML Kit avec sensibilité et détection des paupières
-- Diagnostic bouche et tête dans la prévisualisation
-- Décors animés, huit voix au choix et mode TikTok LIVE conservés
-- Signature Android permanente conservée. Aucune désinstallation requise depuis la version stable.
+CHK Alien Live 0.6.9 — premier rendu GLB natif.
+Pluthorien Alpha 3D avec la vraie texture du modèle, suivi de l'orientation et rotation de la mâchoire.
+Mode 2D conservé pour les autres personnages ou en cas d'échec du moteur 3D. Décors animés, menu Voix, TikTok plein écran et MAJAUTO conservés.
+Limites : modèle GLB issu d'une image, visages de profil approximatifs et pas de synchronisation phonétique parfaite. Le partage audio TikTok reste à vérifier sur Honor 200.
