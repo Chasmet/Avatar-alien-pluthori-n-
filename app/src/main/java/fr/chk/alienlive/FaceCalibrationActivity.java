@@ -56,10 +56,13 @@ public final class FaceCalibrationActivity extends Activity {
                  !AlienData.prefs(this).getBoolean("experimentalAlpha",false));
         overlay=new FacePointsOverlay(this);
         modelSlot.addView(overlay,new FrameLayout.LayoutParams(-1,-1));
-        overlay.configure(current,(which,x,y)->{
-            applySettings();
-            note.setText("Point "+(which==0?"œil gauche":which==1?"œil droit":"bouche")
-                +" : "+Math.round(x*100f)+" / "+Math.round(y*100f)+" %. Enregistre pour conserver.");
+        overlay.configure(current,new FacePointsOverlay.Listener(){
+            @Override public void onMove(int which,float x,float y){
+                applySettings();
+                note.setText("Point "+(which==0?"œil gauche":which==1?"œil droit":"bouche")
+                    +" : "+Math.round(x*100f)+" / "+Math.round(y*100f)+" %. Enregistre pour conserver.");
+            }
+            @Override public void onRelease(){glb.refreshFaceRig();}
         });
         RadioGroup modes=findViewById(R.id.calMode);
         modes.check(current.mode==FaceCalibration.AUTO?R.id.calAuto
@@ -69,6 +72,7 @@ public final class FaceCalibrationActivity extends Activity {
                 id==R.id.calManual?FaceCalibration.MANUAL:FaceCalibration.HYBRID;
             overlay.setVisibility(current.mode==FaceCalibration.AUTO?View.INVISIBLE:View.VISIBLE);
             applySettings();
+            glb.refreshFaceRig();
         });
         overlay.setVisibility(current.mode==FaceCalibration.AUTO?View.INVISIBLE:View.VISIBLE);
         Switch independent=findViewById(R.id.calIndependent);
