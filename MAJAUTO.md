@@ -1,27 +1,15 @@
-# CHK Alien Live — majauto
+# CHK Alien Live — procédure MAJAUTO
 
-## Canal de publication
+Dépôt et publication exclusivement dans `Chasmet/Avatar-alien-pluthori-n-`.
 
-APK signé et manifeste statique :
-- Workflow : `.github/workflows/chk-alien-live-build.yml` sur la branche `chk-alien-live-build-20261121`
-- Manifeste : `chk-alien-live/update.json` (créé à la première Release signée)
-- Releases : tags `chk-alien-live-v0.5.N` uniquement.
+1. Compiler Honor via `.github/workflows/android.yml` (Android 34, Java 17, Gradle 8.7).
+2. Signer l'APK de release avec la **clé JKS permanente de v0.5.11** hors du dépôt public.
+3. Placer `CHK-Alien-Live-vX.Y.Z.apk` sous `distribution/` et compléter `update.json` à la racine.
+4. `publish.yml` contrôle la signature, le package `fr.chk.alienlive`, la version et SHA-256, puis crée la Release GitHub `chk-alien-live-vX.Y.Z`.
+5. L'APK consulte `https://raw.githubusercontent.com/Chasmet/Avatar-alien-pluthori-n-/main/update.json` et propose l'installation Android, sans désinstaller la version stable.
 
-## Première activation obligatoire
+Obligatoire : signature identique, versionCode croissant, même identifiant de package. Ne jamais placer la clé ou ses mots de passe dans un dépôt public.
 
-Dans GitHub `Settings > Secrets and variables > Actions`, ajouter **quatre secrets** :
+L'APK v0.5.11 a encore l'ancien canal d'actualisation : l'installation initiale de la nouvelle version issue du dépôt dédié doit être réalisée depuis son APK direct. Les versions suivantes ont MAJAUTO depuis le dépôt dédié.
 
-- `CHK_ALIEN_KEYSTORE_BASE64` : base64 de la clé privée JKS permanente ;
-- `CHK_ALIEN_KEYSTORE_PASSWORD` ;
-- `CHK_ALIEN_KEY_ALIAS` ;
-- `CHK_ALIEN_KEY_PASSWORD`.
-
-**Ne jamais publier la clé privée, son base64 ni ses mots de passe dans GitHub.** Conserver une sauvegarde indépendante.
-
-Relancer le workflow ou effectuer un nouveau commit sur la branche. GitHub Actions compile `assembleDebug`, puis `assembleRelease`, vérifie package et signature et publie la Release seulement en cas de succès. Le manifeste contient `versionCode`, `versionName`, `packageName`, `apkUrl`, `sha256`.
-
-## Conservation des données
-
-Les anciens APK v0.3 / v0.4 sont installés sous le package `fr.chk.alienlive.debug` et signés par des clés de débogage éphémères. Ils ne sont **pas compatibles** avec l'APK stable signé sous `fr.chk.alienlive`. La transition initiale nécessite une nouvelle installation (les deux versions peuvent coexister). **Après cette transition**, ne changer ni l'identifiant de package ni la clé privée pour préserver les données lors des mises à jour.
-
-Le téléchargement et l'installation sont soumis à une confirmation de l'utilisateur par Android ; ne pas prétendre que l'APK peut être installé silencieusement.
+Si les secrets de signature GitHub Actions ne sont pas configurés, la clé reste privée et l'APK est signé en dehors de CI. La diffusion d'une version ne doit pas être annoncée sans Release effectivement publiée.
