@@ -35,6 +35,7 @@ public final class Alien3DView extends GLSurfaceView {
     private final StageRenderer renderer;
     private volatile float yaw=0f,pitch=0f,roll=0f,mouth=0f,blink=0f,x=.5f,y=.5f;
     private volatile boolean saver=false;
+    private volatile boolean eyesEnabled=true;
     private volatile boolean naturalModel=true;
     // Charge d'abord le véritable modèle historique, non sa reconstruction basse résolution.
     private volatile String activeAsset="pluthorien_alpha.glb";
@@ -66,6 +67,7 @@ public final class Alien3DView extends GLSurfaceView {
     }
     public void setExpression(float yaw,float pitch,float blink){this.yaw=yaw;this.pitch=pitch;this.blink=blink;}
     public void setBatterySaver(boolean enable){saver=enable;}
+    public void setEyeAnimations(boolean enabled){eyesEnabled=enabled;}
     public void setNaturalModel(boolean enable){naturalModel=enable;}
     public void setCharacter(int index,boolean originalAlpha){
         if(index<0||index>=AlienData.MODEL_FILES.length)return;
@@ -178,7 +180,7 @@ public final class Alien3DView extends GLSurfaceView {
             easedJaw+=(mouth-easedJaw)*(mouth>easedJaw?.66f:.46f);
             float t=android.os.SystemClock.uptimeMillis()*.001f;
             float blinkPulse=(t%4.9f)>4.71f?(float)Math.sin(((t%4.9f)-4.71f)/.19f*3.1415927f):0f;
-            easedBlink+=(Math.max(blink,blinkPulse*.93f)-easedBlink)*.52f;
+            easedBlink+=((eyesEnabled?Math.max(blink,blinkPulse*.93f):0f)-easedBlink)*.52f;
             easedX+=(x-easedX)*blend;
             easedY+=(y-easedY)*blend;
             Matrix.setLookAtM(view,0,0f,0f,3.7f,0f,-.13f,0f,0f,1f,0f);
@@ -198,8 +200,8 @@ public final class Alien3DView extends GLSurfaceView {
             GLES20.glUseProgram(program);
             GLES20.glUniform1f(importedLoc,imported?1f:0f);
             GLES20.glUniform4f(faceLoc,centerX,faceMinY,faceWidth,faceHeight);
-            GLES20.glUniform2f(gazeLoc,(float)Math.sin(t*.67f)*.75f+easedYaw*.15f,
-                (float)Math.sin(t*.49f)*.42f+easedPitch*.12f);
+            GLES20.glUniform2f(gazeLoc,eyesEnabled?((float)Math.sin(t*.67f)*.75f+easedYaw*.15f):0f,
+                eyesEnabled?((float)Math.sin(t*.49f)*.42f+easedPitch*.12f):0f);
             GLES20.glUniform1f(breathLoc,breath);
             GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
             GLES20.glBindTexture(GLES20.GL_TEXTURE_2D,textureId);
