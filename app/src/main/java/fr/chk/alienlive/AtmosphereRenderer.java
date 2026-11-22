@@ -126,6 +126,7 @@ public final class AtmosphereRenderer {
         drawGroundMist(c,w,h,t,scene,mode,amount,saver);
         drawParticles(c,w,h,t,scene,mode,amount,saver,false);
         drawMovingObjects(c,w,h,t,scene,amount);
+        if(scene==2)drawAncientTempleEnergy(c,w,h,t,amount,saver);
         if((mode==3||mode==5)&&scene!=1)drawRain(c,w,h,t,amount,saver,mode==5);
         if(weatherHeavy && scene!=1) drawWind(c,w,h,t,amount,saver);
         drawLighting(c,w,h,t,scene,mode,amount);
@@ -235,6 +236,42 @@ public final class AtmosphereRenderer {
             c.drawPath(path,air);
         }
         air.setStyle(Paint.Style.FILL);
+    }
+    /** Bioluminescence au fond du décor Annunaki : colonnes d'énergie, balises
+     *  lointaines et halos pulsants. Tout est dessiné DERRIÈRE l'avatar 3D.
+     */
+    private void drawAncientTempleEnergy(Canvas c,float w,float h,float t,float power,boolean saver){
+        air.setShader(null);
+        air.setStyle(Paint.Style.STROKE);
+        air.setStrokeCap(Paint.Cap.ROUND);
+        int count=saver?2:4;
+        for(int i=0;i<count;i++){
+            float x0=w*(.11f+i*.26f);
+            float baseY=h*(.46f+.045f*(i%2));
+            float peakY=h*(.16f+.06f*(i%3));
+            float flicker=.45f+.55f*(float)Math.pow(Math.sin(t*.67f+i*1.7f),2);
+            int alpha=(int)(power*(saver?28:47)*flicker);
+            air.setStrokeWidth(Math.max(1f,w*.004f));
+            air.setColor(Color.argb(alpha,96,176,251));
+            c.drawLine(x0,baseY,x0,peakY,air);
+            air.setStrokeWidth(Math.max(1f,w*.0014f));
+            air.setColor(Color.argb(Math.min(200,alpha*2),179,220,255));
+            c.drawLine(x0,baseY,x0,peakY,air);
+            air.setColor(Color.argb(Math.min(160,alpha*2),97,185,244));
+            air.setStyle(Paint.Style.FILL);
+            c.drawCircle(x0,peakY,Math.max(1f,w*.004f)*(1f+flicker),air);
+            air.setStyle(Paint.Style.STROKE);
+        }
+        air.setStyle(Paint.Style.FILL);
+        if(!saver){
+            for(int i=0;i<7;i++){
+                float px=w*(.12f+.12f*i+(float)Math.sin(t*.27f+i)*.015f);
+                float py=h*(.34f+.07f*(i%3)+(float)Math.cos(t*.31f+i)*.027f);
+                air.setColor(Color.argb((int)(power*29*(.4f+.6f*Math.abs(Math.sin(t*.43f+i)))),
+                    176,206,253));
+                c.drawCircle(px,py,Math.max(1f,w*.002f),air);
+            }
+        }
     }
     private void drawMovingObjects(Canvas c,float w,float h,float t,int scene,float amount) {
         air.setShader(null);
