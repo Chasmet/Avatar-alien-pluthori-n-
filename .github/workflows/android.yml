@@ -54,6 +54,10 @@ jobs:
           test -s .preview-signing/debug.jks
       - name: Android SDK 34
         run: sdkmanager "platforms;android-34" "build-tools;34.0.0"
+      - name: Générer et valider les 5 vrais modèles GLB HD
+        run: |
+          python3 tools/generate_alien_hd.py
+          python3 tools/verify_glb_hd.py
       - name: Verifier les fichiers sources
         run: |
           python3 tools/verify_source.py
@@ -91,6 +95,18 @@ jobs:
         run: |
           test -s app/build/outputs/apk/honor/release/app-honor-release-unsigned.apk
           "$ANDROID_HOME/build-tools/34.0.0/aapt" dump badging app/build/outputs/apk/honor/release/app-honor-release-unsigned.apk | grep "package: name='fr.chk.alienlive'"
+      - name: Sauvegarder les cinq GLB HD vérifiés dans GitHub
+        if: github.ref == 'refs/heads/main'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git add app/src/main/assets/pluthorien_alpha_hd.glb app/src/main/assets/pluthorien_sage_hd.glb app/src/main/assets/pluthorien_guard_hd.glb app/src/main/assets/pluthorien_shadow_hd.glb app/src/main/assets/pluthorien_annunaki_hd.glb
+          if ! git diff --cached --quiet; then
+            git commit -m "assets: five HD alien GLB with visemes and original portrait textures [skip ci]"
+            git push origin HEAD:main
+          fi
       - uses: actions/upload-artifact@v4
         with:
           name: CHK-Alien-Live-Honor-Release-Unsigned
@@ -138,8 +154,8 @@ jobs:
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release upload "$TAG" "$APK" "$COMPAT" --clobber --repo "$GITHUB_REPOSITORY"
           else
-            gh release create "$TAG" "$APK#CHK-Pluthor-Honor-Preview.apk" "$COMPAT#CHK-Pluthor-Android-Preview.apk" \
-              --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease \
+            gh release create "$TAG" "$APK" "$COMPAT" \
+              --repo "$GITHUB_REPOSITORY" --target "$(git rev-parse HEAD)" --prerelease \
               --title "CHK Pluthor — Préversion $VERSION" \
               --notes "$NOTES"
           fi

@@ -75,3 +75,23 @@ Cette correction est un retour à la référence d'apparence, pas une validation
 - Les cinq GLB embarqués demeurent : Alpha original par défaut ; Sage, Gardien, Ombre et Annunaki activables **un par un** depuis Personnages sans remplacer les portraits 2D par défaut. Le réglage global de test 3D demeure accessible.
 - MAJAUTO : la Release contient les sommes SHA-256 pour les APK Honor et Compat. Le gestionnaire exploite le digest GitHub ou, en secours, les sommes inscrites dans les notes, puis vérifie le certificat Android avant l'installation. La même signature est obligatoire pour conserver les données.
 - Limites : pas de synchronisation phonétique complète sans blendshapes faciaux ; une application externe ne reçoit pas automatiquement la voix transformée par CHK. Tests visuels et audio nécessaires sur appareil réel.
+
+## Cinq avatars GLB HD articulés (génération déterministe)
+
+La compilation génère cinq fichiers GLB **réels** dans `app/src/main/assets/` :
+
+| Personnage | Fichier facultatif |
+| --- | --- |
+| Pluthorien Alpha | `pluthorien_alpha_hd.glb` |
+| Pluthorien Sage | `pluthorien_sage_hd.glb` |
+| Pluthorien Gardien | `pluthorien_guard_hd.glb` |
+| Pluthorien Ombre | `pluthorien_shadow_hd.glb` |
+| Annunaki ancien | `pluthorien_annunaki_hd.glb` |
+
+- `python3 tools/generate_alien_hd.py` réutilise **exactement** les textures WebP embarquées dans les GLB précédents, sans télécharger ni inventer de nouvelles photos.
+- Le maillage avant est subdivisé et conserve le portrait d'origine. Le maillage arrière possède une profondeur arrondie, avec un buste et une cavité buccale. Les oreilles des personnages Sage et Gardien sont sculptées en volume.
+- Les cibles de déformation `mouthOpen`, `mouthFunnel`, `mouthSmile`, `eyeBlink`, `jawLeft` et `jawRight` sont présentes dans les GLB. Le rendu Android pilote réellement `mouthOpen` et `eyeBlink` par le microphone/la caméra. Les autres cibles sont disponibles pour des moteurs 3D compatibles ; elles ne constituent pas une reconnaissance phonétique.
+- `python3 tools/verify_glb_hd.py` contrôle les cinq fichiers, leurs sommets, les articulations et l'identité binaire des textures d'origine. GitHub Actions enregistre les vrais `.glb` après validation puis les place dans l'APK signé.
+- Le Pluthorien **Alpha original** `pluthorien_alpha.glb` reste le rendu utilisé par défaut. Les quatre autres portraits 2D historiques restent par défaut ; chaque GLB HD s'active individuellement depuis « Personnages », ou via les réglages expérimentaux.
+
+**Limite importante :** une photographie unique ne donne ni profondeur réelle derrière le visage ni capture des expressions. Il s'agit d'une reconstruction 3D procédurale avec face fidèle de face et arrière approximatif, **pas** d'un scan photoréaliste parfait à 360°. Les visèmes sont une animation géométrique guidée par l'ouverture de la bouche, pas une synchronisation phonème par phonème.
