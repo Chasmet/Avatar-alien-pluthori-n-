@@ -1,0 +1,7 @@
+<resources>
+  <string name="app_name">CHK Alien Live</string>
+  <string name="live">MODE LIVE — PLEIN ÉCRAN</string>
+  <string name="characters">Personnages</string>
+  <string name="backgrounds">Décors</string>
+  <string name="settings">Réglages</string>
+</resources>

@@ -1,0 +1,43 @@
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:background="#080919" android:fillViewport="true">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="vertical" android:padding="20dp">
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:text="STUDIO VOIX • CHK" android:textColor="#E5C5FF"
+            android:textStyle="bold" android:textSize="26sp" android:paddingBottom="12dp"/>
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:text="Choisis une voix, teste-la au micro, puis applique tes réglages au mode LIVE."
+            android:textColor="#ECE8FF" android:textSize="15sp" android:paddingBottom="18dp"/>
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:text="Civilisations et transformations" android:textColor="#E3B7FF" android:textSize="17sp"/>
+        <Spinner android:id="@+id/voicePresets" android:layout_width="match_parent" android:layout_height="60dp"
+            android:backgroundTint="#C58FFF"/>
+        <TextView android:id="@+id/voiceDepthLabel" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:text="Profondeur : 75 %" android:textColor="#FFFFFF"
+            android:paddingTop="12dp"/>
+        <SeekBar android:id="@+id/voiceDepth" android:layout_width="match_parent" android:layout_height="48dp"
+            android:max="100" android:progress="75"/>
+        <TextView android:id="@+id/voiceMixLabel" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:text="Effet extraterrestre : 85 %" android:textColor="#FFFFFF"
+            android:paddingTop="10dp"/>
+        <SeekBar android:id="@+id/voiceMix" android:layout_width="match_parent"
+            android:layout_height="48dp" android:max="100" android:progress="85"/>
+        <Button android:id="@+id/voiceToggle" android:layout_width="match_parent"
+            android:layout_height="58dp" android:text="Écouter ma voix transformée"
+            android:textAllCaps="false" android:textColor="#FFFFFF" android:background="@drawable/btn_primary"/>
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:text="Niveau du microphone" android:textColor="#D5C6EF" android:paddingTop="16dp"/>
+        <ProgressBar android:id="@+id/voiceLevel" style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent" android:layout_height="24dp" android:max="100"/>
+        <TextView android:id="@+id/voiceState" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:padding="12dp"
+            android:text="Prêt à tester" android:textColor="#AEF0DC"/>
+        <Button android:id="@+id/saveVoice" android:layout_width="match_parent"
+            android:layout_height="56dp" android:text="UTILISER CETTE VOIX EN LIVE"
+            android:textAllCaps="false" android:background="@drawable/btn_primary" android:textColor="#FFFFFF"/>
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:paddingTop="20dp" android:textColor="#FFE2A8" android:textSize="14sp"
+            android:text="Important : la voix est transformée et diffusée en sortie média par CHK. TikTok mobile ne reçoit cet effet que s’il capture aussi le son interne. Sans cette option, le micro TikTok reste normal. Un casque limite le larsen."/>
+    </LinearLayout>
+</ScrollView>

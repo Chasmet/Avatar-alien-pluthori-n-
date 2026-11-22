@@ -1,0 +1,46 @@
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:background="#050513" android:fillViewport="true">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="vertical" android:padding="20dp">
+        <TextView android:layout_width="match_parent" android:layout_height="60dp"
+            android:text="Réglages CHK Alien Live" android:textStyle="bold"
+            android:textColor="#FFFFFF" android:textSize="25sp" android:gravity="center_vertical" />
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="14dp" android:text="Météo et décors animés"
+            android:textStyle="bold" android:textColor="#E6B5FF" android:textSize="20sp" />
+        <Switch android:id="@+id/animatedWeather" android:layout_width="match_parent"
+            android:layout_height="60dp" android:text="Activer les décors vivants"
+            android:textColor="#FFFFFF" android:checked="true" />
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:text="Sélectionner la météo" android:textColor="#DDCDE9" android:textSize="15sp" />
+        <Spinner android:id="@+id/weatherMode" android:layout_width="match_parent"
+            android:layout_height="58dp" android:backgroundTint="#B083F4" />
+        <TextView android:id="@+id/weatherIntensityLabel" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:layout_marginTop="10dp"
+            android:text="Intensité des effets : 65 %" android:textColor="#DDCDE9" android:textSize="15sp" />
+        <SeekBar android:id="@+id/weatherIntensity" android:layout_width="match_parent"
+            android:layout_height="50dp" android:max="100" android:progress="65" />
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:text="La météo évolutive change automatiquement toutes les 65 secondes, avec transitions progressives. Brume, poussière, nuages, pluie et orages sont générés sans connexion."
+            android:textColor="#BCAFD1" android:textSize="13sp" android:paddingBottom="16dp" />
+        <Switch android:id="@+id/batterySaver" android:layout_width="match_parent" android:layout_height="64dp"
+            android:text="Économie de batterie (20 images/s)" android:textColor="#FFFFFF" android:checked="true" />
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="15dp" android:text="Mises à jour (majauto)"
+            android:textStyle="bold" android:textColor="#E6B5FF" android:textSize="20sp" />
+        <Switch android:id="@+id/autoUpdate" android:layout_width="match_parent" android:layout_height="64dp"
+            android:text="Recherche automatique des nouvelles versions" android:textColor="#FFFFFF" android:checked="true" />
+        <Button android:id="@+id/checkUpdate" android:layout_width="match_parent" android:layout_height="56dp"
+            android:text="Vérifier les mises à jour" android:textAllCaps="false" />
+        <Switch android:id="@+id/animateMouth" android:layout_width="match_parent" android:layout_height="64dp"
+            android:text="Animation bouche par caméra (expérimental)"
+            android:textColor="#FFFFFF" android:checked="true" />
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:paddingTop="14dp"
+            android:text="La transformation de la voix est proposée dans le nouvel écran Voix. Elle diffuse l’effet sur la sortie audio du téléphone et ne remplace PAS automatiquement le microphone TikTok. Cette version anime les décors, suit la tête et estime les mouvements de bouche par caméra. Ce suivi est approximatif, sans transcription ni accès au micro. Les personnages restent des portraits 2D avec une animation proxy : un visage 3D photoréaliste exige un modèle riggé."
+            android:textColor="#C8BDD8" android:textSize="14sp" />
+        <TextView android:id="@+id/version" android:layout_width="match_parent" android:layout_height="70dp"
+            android:gravity="center_vertical" android:textColor="#B89ACF" android:textSize="14sp" />
+    </LinearLayout>
+</ScrollView>

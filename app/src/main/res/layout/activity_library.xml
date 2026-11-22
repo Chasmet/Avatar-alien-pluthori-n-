@@ -1,0 +1,13 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:orientation="vertical"
+    android:layout_width="match_parent" android:layout_height="match_parent" android:padding="14dp" android:background="#050513">
+    <TextView android:id="@+id/title" android:layout_width="match_parent" android:layout_height="62dp"
+        android:text="Personnages" android:textColor="#FFFFFF" android:textStyle="bold" android:textSize="25sp" android:gravity="center_vertical"/>
+    <Button android:id="@+id/importAsset" android:layout_width="match_parent"
+        android:layout_height="55dp" android:text="Importer une image" android:textAllCaps="false" />
+    <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:paddingTop="7dp" android:paddingBottom="12dp"
+        android:text="Les images sont conservées uniquement sur le téléphone. Un simple portrait reste une image 2D : le suivi précis attend un modèle facial animé."
+        android:textSize="12sp" android:textColor="#CBC1DD" />
+    <GridView android:id="@+id/gallery" android:layout_width="match_parent" android:layout_height="0dp"
+        android:layout_weight="1" android:numColumns="2" android:horizontalSpacing="10dp" android:verticalSpacing="12dp" />
+</LinearLayout>
