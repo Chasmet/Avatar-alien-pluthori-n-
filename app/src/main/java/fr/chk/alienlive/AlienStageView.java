@@ -18,9 +18,11 @@ import android.view.View;
 public final class AlienStageView extends View {
     private Bitmap characterBitmap, sceneBitmap;
     private final PortraitAnimator portraitAnimator=new PortraitAnimator();
-    private volatile float mouthOpen=0f;
+    private volatile float mouthOpen=0f, headYaw=0f, headPitch=0f, eyeLeft=0f, eyeRight=0f;
+    private float targetMouth=0f;
     private volatile long lastFaceAt=0L;
-    private boolean animateMouth=true;
+    private boolean animateMouth=true, animateEyes=true, followHead=true;
+    private float mouthSensitivity=1.7f;
     private final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
     private final Paint labelPaint=new Paint(Paint.ANTI_ALIAS_FLAG);
     private final AtmosphereRenderer atmosphere;
@@ -51,19 +53,33 @@ public final class AlienStageView extends View {
         selectedMode=AlienData.prefs(getContext()).getInt("weatherMode",0);
         intensity=AlienData.prefs(getContext()).getInt("weatherIntensity",65);
         animate=AlienData.prefs(getContext()).getBoolean("animatedWeather",true);
-        saveBattery=AlienData.prefs(getContext()).getBoolean("saveBattery",true);
+        saveBattery=AlienData.prefs(getContext()).getBoolean("saveBattery",false);
         animateMouth=AlienData.prefs(getContext()).getBoolean("animateMouth",true);
+        animateEyes=AlienData.prefs(getContext()).getBoolean("animateEyes",true);
+        followHead=AlienData.prefs(getContext()).getBoolean("followHead",true);
+        mouthSensitivity=AlienData.prefs(getContext()).getInt("mouthSensitivity",75)/50f;
         lastReload=SystemClock.uptimeMillis();
         atmosphere.reset();
         invalidate();
     }
     public void setCleanMode(boolean enable) { clean=enable;invalidate(); }
     public void updatePose(float x,float y,float roll,float mouth) {
-        headX+=(x-headX)*.16f;headY+=(y-headY)*.16f;headRoll+=(roll-headRoll)*.12f;
-        mouthOpen+=(mouth-mouthOpen)*.26f;
+        float gain=Math.max(.2f,Math.min(3f,mouthSensitivity));
+        headX+=(x-headX)*.34f;headY+=(y-headY)*.32f;headRoll+=(roll-headRoll)*.30f;
+        targetMouth=Math.max(0f,Math.min(1f,mouth*gain));
+        // Fermeture plus rapide que l'ancien lissage a 26% : reduit le retard visible.
+        float speed=targetMouth>mouthOpen?.68f:.56f;
+        mouthOpen+=(targetMouth-mouthOpen)*speed;
         lastFaceAt=SystemClock.uptimeMillis();
-        faceFound=true;postInvalidateOnAnimation();
+        faceFound=true;
+        postInvalidateOnAnimation();
     }
+    public void updateExpression(float yaw,float pitch,float blinkLeft,float blinkRight){
+        headYaw+=(yaw-headYaw)*.35f;headPitch+=(pitch-headPitch)*.35f;
+        eyeLeft+=(blinkLeft-eyeLeft)*.42f;eyeRight+=(blinkRight-eyeRight)*.42f;
+        postInvalidateOnAnimation();
+    }
+    public float getMouthLevel(){return mouthOpen;}
     @Override protected void onDraw(Canvas c) {
         super.onDraw(c);
         float w=getWidth(),h=getHeight();
@@ -73,19 +89,32 @@ public final class AlienStageView extends View {
         if(animate)atmosphere.renderBehind(c,w,h,selectedScene,selectedMode,intensity,headX,headY,saveBattery);
         if(characterBitmap!=null) {
             long time=SystemClock.uptimeMillis();
-            boolean freshFace=faceFound&&(time-lastFaceAt)<1600L;
-            if(!freshFace)mouthOpen*=.93f;
+            boolean freshFace=faceFound&&(time-lastFaceAt)<1700L;
+            if(!freshFace)mouthOpen*=.80f;
             float breathing=(float)Math.sin(time*.00145f);
-            float cx=w*.50f+(headX-.5f)*w*.28f+breathing*w*.0025f;
-            float cy=h*.52f+(headY-.5f)*h*.16f+breathing*h*.004f;
-            float portraitW=w*.83f;
+            float positionX=followHead&&freshFace?(headX-.5f):0f;
+            float positionY=followHead&&freshFace?(headY-.5f):0f;
+            float cx=w*.50f+positionX*w*.48f+breathing*w*.003f;
+            float cy=h*.52f+positionY*h*.29f+breathing*h*.004f;
+            float portraitW=w*.86f;
             float portraitH=portraitW*characterBitmap.getHeight()/characterBitmap.getWidth();
-            // Keep the original capture visible even while TikTok shares the screen.
-            c.save();c.rotate((freshFace?headRoll*.60f:0f)+breathing*.28f,cx,cy);
+            float turn=freshFace&&followHead?Math.max(-1f,Math.min(1f,headYaw)):0f;
+            float tilt=freshFace&&followHead?Math.max(-1f,Math.min(1f,headPitch)):0f;
+            c.save();
+            c.rotate((freshFace&&followHead?headRoll*.85f:0f)+breathing*.30f,cx,cy);
+            float sizeX=1f-Math.abs(turn)*.055f;
+            c.scale(sizeX,1f,cx,cy);
             paint.setAlpha(255);
             RectF portrait=new RectF(cx-portraitW/2f,cy-portraitH/2f,cx+portraitW/2f,cy+portraitH/2f);
-            c.drawBitmap(characterBitmap,null,portrait,paint);
-            portraitAnimator.draw(c,portrait,AlienData.character(getContext()),mouthOpen,animateMouth && freshFace);
+            c.translate(portrait.left,portrait.top);
+            c.scale(portrait.width()/characterBitmap.getWidth(),
+                    portrait.height()/characterBitmap.getHeight());
+            // Le maillage transforme la texture originale plutot qu'un point noir dessine.
+            portraitAnimator.draw(c,characterBitmap,AlienData.character(getContext()),
+                freshFace?mouthOpen:0f,turn,tilt,
+                animateEyes&&freshFace?eyeLeft:0f,
+                animateEyes&&freshFace?eyeRight:0f,
+                animateMouth||animateEyes||followHead);
             c.restore();
         }
         if(animate)atmosphere.renderFront(c,w,h,selectedScene,selectedMode,intensity,saveBattery);
