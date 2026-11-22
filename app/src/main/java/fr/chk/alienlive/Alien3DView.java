@@ -37,6 +37,7 @@ public final class Alien3DView extends GLSurfaceView {
     private volatile boolean reverseVertical=false;
     private volatile FaceCalibration faceCalibration=null;
     private volatile float calibrationZoom=1f,calibrationPanX=0f,calibrationPanY=0f;
+    private volatile boolean calibrationViewActive=false;
     private volatile boolean saver=false;
     private volatile boolean eyesEnabled=true;
     private volatile boolean naturalModel=true;
@@ -81,6 +82,7 @@ public final class Alien3DView extends GLSurfaceView {
      * Ce réglage n'agit pas sur la taille des GLB en LIVE.
      */
     public void setCalibrationViewport(float zoom,float offsetX,float offsetY){
+        calibrationViewActive=true;
         calibrationZoom=Math.max(1f,Math.min(5f,zoom));
         calibrationPanX=Math.max(-1.5f,Math.min(1.5f,offsetX));
         calibrationPanY=Math.max(-1.5f,Math.min(1.5f,offsetY));
@@ -225,9 +227,9 @@ public final class Alien3DView extends GLSurfaceView {
                 Matrix.scaleM(root,0,calibrationZoom,calibrationZoom,calibrationZoom);
             }
             boolean imported=activeCustomFile!=null;
-            float breath=(float)Math.sin(t*1.7f);
+            float breath=calibrationViewActive?0f:(float)Math.sin(t*1.7f);
             Matrix.translateM(root,0,(easedX-.5f)*.34f,(.5f-easedY)*.23f+(imported?breath*.008f:0f),0f);
-            if(imported){
+            if(imported&&!calibrationViewActive){
                 Matrix.rotateM(root,0,(float)Math.sin(t*.38f)*1.65f,0f,0f,1f);
                 Matrix.rotateM(root,0,(float)Math.sin(t*.26f)*1.4f,0f,1f,0f);
             }
