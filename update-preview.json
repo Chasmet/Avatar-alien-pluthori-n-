@@ -1,7 +1,8 @@
 {
-  "versionCode": 20014,
-  "versionName": "0.6.14",
+  "versionCode": 20016,
+  "versionName": "0.6.16",
   "packageName": "fr.chk.alienlive.debug",
-  "apkUrl": "https://github.com/Chasmet/Avatar-alien-pluthori-n-/releases/download/chk-pluthor-preview-14/CHK-Pluthor-Honor-Preview.apk",
-  "sha256": "fdbceecd908af83bbc1c92220578396fbb3515afaf7bcae9fdabb0a824389d02"
+  "apkUrl": "https://github.com/Chasmet/Avatar-alien-pluthori-n-/releases/download/chk-pluthor-preview-16/app-honor-debug.apk",
+  "sha256": "77f1a45b9e7f5ab8ab5a3cc4b4f5162afdf20f2c928af7ce300607bd7ed74fb7",
+  "signerSha256": "f9d40980142bc2cbe7df30083d8f030d92f987dc0d351f4e47325008c2a6b6c2"
 }
