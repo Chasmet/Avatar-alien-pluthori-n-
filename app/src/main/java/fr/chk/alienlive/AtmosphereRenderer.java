@@ -107,7 +107,10 @@ public final class AtmosphereRenderer {
     }
     private static int weatherForCycle(int scene,long cycle) {
         // Space has atmospheric *effects*, not terrestrial rain outside a spaceship.
-        int[][] cycles={{1,2,4,5,1,3},{1,2,5,4,2,1},{2,3,1,4,5,2},{2,3,1,4,5,2}};
+        int[][] cycles={
+            {1,2,4,5,1,3}, {1,2,5,4,2,1}, {2,3,1,4,5,2}, {2,3,1,4,5,2},
+            {2,1,2,5,1,2}, {1,2,1,4,1,2}, {1,2,1,5,1,2}, {2,4,1,5,2,4}
+        };
         int[] preset=cycles[(scene%cycles.length+cycles.length)%cycles.length];
         return preset[(int)((cycle%preset.length+preset.length)%preset.length)];
     }
@@ -127,10 +130,58 @@ public final class AtmosphereRenderer {
         drawParticles(c,w,h,t,scene,mode,amount,saver,false);
         drawMovingObjects(c,w,h,t,scene,amount);
         if(scene==2)drawAncientTempleEnergy(c,w,h,t,amount,saver);
+        if(scene>=4&&scene<=7)drawNewSceneEffects(c,w,h,t,scene,amount,saver);
         if((mode==3||mode==5)&&scene!=1)drawRain(c,w,h,t,amount,saver,mode==5);
         if(weatherHeavy && scene!=1) drawWind(c,w,h,t,amount,saver);
         drawLighting(c,w,h,t,scene,mode,amount);
         if(mode==5)drawLightning(c,w,h,t,scene,amount);
+    }
+    /** Effets propres aux quatre nouveaux décors. Tout est derrière le GLB.
+     *  Peu de géométrie : 12-40 particules par environnement, économie de batterie respectée.
+     */
+    private void drawNewSceneEffects(Canvas c,float w,float h,float t,int scene,float amount,boolean saver) {
+        air.setStyle(Paint.Style.FILL);
+        air.setShader(null);
+        final int n=saver?11:32;
+        for(int j=0;j<n;j++){
+            int i=(j*3+17)%x.length;
+            float tt=t*(scene==6?.22f:scene==7?.085f:.053f);
+            float xx=fract(x[i]+tt*speed[i]*(j%2==0?1f:-.70f))*w;
+            float yy=fract(y[i]+t*(scene==4?-.035f:scene==5?-.018f:scene==6?.015f:.011f))*(h*.83f);
+            float pulse=.5f+.5f*(float)Math.sin(t*(scene==5?2.2f:1.13f)+phase[i]);
+            int alpha=(int)Math.min(240,Math.max(0,amount*(45+115*pulse)));
+            float sizePx=Math.max(1f,w*(scene==4?.0031f:scene==5?.0027f:.0022f));
+            if(scene==4){
+                air.setColor(Color.argb(alpha,88,208,255));
+                c.drawCircle(xx,yy,sizePx*(.6f+pulse),air);
+                if(j%6==0){
+                    air.setStyle(Paint.Style.STROKE);air.setStrokeWidth(Math.max(1f,w*.0009f));
+                    air.setColor(Color.argb(alpha/3,131,210,255));
+                    c.drawCircle(xx,yy,sizePx*(3.0f+pulse*2.0f),air);
+                    air.setStyle(Paint.Style.FILL);
+                }
+            }else if(scene==5){
+                air.setColor(Color.argb(alpha,65,239,165));
+                c.drawCircle(xx,yy,sizePx*(.6f+pulse),air);
+            }else if(scene==6){
+                // Navettes lumineuses au loin, trajectoires en perspective.
+                air.setColor(Color.argb(alpha/3,76,154,219));
+                c.drawLine(xx-w*.032f,yy+w*.006f,xx,yy,air);
+                air.setColor(Color.argb(alpha,166,213,255));
+                c.drawCircle(xx,yy,Math.max(1f,sizePx*.7f),air);
+            }else if(j%4==0){
+                // Météores diffus derrière le personnage, en complément de la poussière.
+                air.setStyle(Paint.Style.STROKE);
+                air.setStrokeWidth(Math.max(1f,w*.0014f));
+                air.setColor(Color.argb(alpha/3,242,173,142));
+                c.drawLine(xx-w*.045f,yy-h*.032f,xx,yy,air);
+                air.setStyle(Paint.Style.FILL);
+            }else{
+                air.setColor(Color.argb(alpha/2,244,175,130));
+                c.drawCircle(xx,yy,sizePx*.8f,air);
+            }
+        }
+        air.setStyle(Paint.Style.FILL);
     }
     private void drawClouds(Canvas c,float w,float h,float t,int scene,int mode,float amount,boolean saver) {
         int count = scene==0?(saver?2:4):scene==1?(saver?3:6):(saver?6:12);
@@ -275,7 +326,7 @@ public final class AtmosphereRenderer {
     }
     private void drawMovingObjects(Canvas c,float w,float h,float t,int scene,float amount) {
         air.setShader(null);
-        if(scene==0||scene==1) {
+        if(scene==0||scene==1||scene==6) {
             // A slowly crossing distant craft, behind the presenter.
             for(int i=0;i<2;i++) {
                 float xx=fract(.74f-i*.45f-t*(.007f+i*.002f))*w;
