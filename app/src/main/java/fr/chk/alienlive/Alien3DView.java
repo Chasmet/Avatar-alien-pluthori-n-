@@ -36,6 +36,8 @@ public final class Alien3DView extends GLSurfaceView {
     private volatile float yaw=0f,pitch=0f,roll=0f,mouth=0f,blinkLeft=0f,blinkRight=0f,smile=0f,x=.5f,y=.5f;
     private volatile boolean reverseVertical=false;
     private volatile FaceCalibration faceCalibration=null;
+    private volatile float calibrationZoom=1f,calibrationPanX=0f,calibrationPanY=0f;
+    private volatile boolean calibrationViewActive=false;
     private volatile boolean saver=false;
     private volatile boolean eyesEnabled=true;
     private volatile boolean naturalModel=true;
@@ -76,6 +78,16 @@ public final class Alien3DView extends GLSurfaceView {
     public void setSmile(float probability){smile=Math.max(0f,Math.min(1f,probability));}
     public void setReverseVertical(boolean enabled){reverseVertical=enabled;}
     public void setFaceCalibration(FaceCalibration cal){faceCalibration=cal;requestRender();}
+    /** Partage le même zoom/panoramique que FacePointsOverlay pendant la calibration.
+     * Ce réglage n'agit pas sur la taille des GLB en LIVE.
+     */
+    public void setCalibrationViewport(float zoom,float offsetX,float offsetY){
+        calibrationViewActive=true;
+        calibrationZoom=Math.max(1f,Math.min(5f,zoom));
+        calibrationPanX=Math.max(-1.5f,Math.min(1.5f,offsetX));
+        calibrationPanY=Math.max(-1.5f,Math.min(1.5f,offsetY));
+        requestRender();
+    }
     public void refreshFaceRig(){if(activeCustomFile!=null){reloadModel=true;requestRender();}}
     public void setBatterySaver(boolean enable){saver=enable;}
     public void setEyeAnimations(boolean enabled){eyesEnabled=enabled;}
@@ -205,10 +217,19 @@ public final class Alien3DView extends GLSurfaceView {
             easedY+=(y-easedY)*blend;
             Matrix.setLookAtM(view,0,0f,0f,3.7f,0f,-.13f,0f,0f,1f,0f);
             Matrix.setIdentityM(root,0);
+            // Calibrage : déplacer/zoomer les vrais sommets au même rythme que les
+            // repères à l'écran. FOV verticale 48° et caméra à 3,7 unités.
+            if(calibrationZoom>1f||calibrationPanX!=0f||calibrationPanY!=0f){
+                float worldHeight=3.7f*2f*.4452287f;
+                float aspect=Math.max(.1f,getWidth()/(float)Math.max(1,getHeight()));
+                Matrix.translateM(root,0,calibrationPanX*worldHeight*aspect,
+                     -calibrationPanY*worldHeight,0f);
+                Matrix.scaleM(root,0,calibrationZoom,calibrationZoom,calibrationZoom);
+            }
             boolean imported=activeCustomFile!=null;
-            float breath=(float)Math.sin(t*1.7f);
+            float breath=calibrationViewActive?0f:(float)Math.sin(t*1.7f);
             Matrix.translateM(root,0,(easedX-.5f)*.34f,(.5f-easedY)*.23f+(imported?breath*.008f:0f),0f);
-            if(imported){
+            if(imported&&!calibrationViewActive){
                 Matrix.rotateM(root,0,(float)Math.sin(t*.38f)*1.65f,0f,0f,1f);
                 Matrix.rotateM(root,0,(float)Math.sin(t*.26f)*1.4f,0f,1f,0f);
             }
