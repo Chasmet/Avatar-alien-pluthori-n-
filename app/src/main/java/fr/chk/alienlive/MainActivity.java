@@ -127,6 +127,7 @@ public final class MainActivity extends Activity {
                     status.setText(message);
                     if(message.startsWith("Visage non détecté")){
                         model3D.setSmile(0f);
+                        model3D.setExpression(0f,0f,0f,0f);
                         if(faceDiagnostics.getVisibility()==View.VISIBLE)
                             faceDiagnostics.setText("Visage non détecté : replace-toi devant la caméra");
                     }
@@ -218,7 +219,7 @@ public final class MainActivity extends Activity {
         lipHandler.removeCallbacks(lipTicker);
         lipHandler.post(lipTicker);
         sync3DMode();
-        tracker.setSaver(AlienData.prefs(this).getBoolean("saveBattery",true));
+        tracker.setSaver(AlienData.prefs(this).getBoolean("saveBattery",false));
         if(voiceRequested) startVoice();
         if(Build.VERSION.SDK_INT>=23&&checkSelfPermission(Manifest.permission.CAMERA)!=PackageManager.PERMISSION_GRANTED){
             requestPermissions(new String[]{Manifest.permission.CAMERA},100);
