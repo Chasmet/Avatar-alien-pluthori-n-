@@ -35,6 +35,7 @@ public final class MainActivity extends Activity {
         @Override public void run(){
             float audio=voice!=null&&voice.isRunning()?voice.getLevel():0f;
             float audioMouth=Math.max(0f,Math.min(1f,(audio-.018f)*5.5f));
+            stage.setVoiceMouth(animateLips?audioMouth:0f);
             boolean recent=android.os.SystemClock.uptimeMillis()-lastFaceMouthAt<450L;
             float mouth=recent?Math.max(trackedMouth,audioMouth*.55f):audioMouth;
             model3D.setPose(lastX,lastY,lastRoll,animateLips?mouth:0f);
