@@ -1,0 +1,48 @@
+plugins { id 'com.android.application' }
+
+android {
+    namespace 'fr.chk.alienlive'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId 'fr.chk.alienlive'
+        minSdk 21
+        targetSdk 34
+        versionCode = 10000 + Integer.parseInt(System.getenv('GITHUB_RUN_NUMBER') ?: '1')
+        versionName = (System.getenv('RELEASE_VERSION') ?: '0.5.0').replace('v','')
+    }
+    flavorDimensions 'tracking'
+    productFlavors {
+        compat { dimension 'tracking'; minSdk 21 }
+        honor { dimension 'tracking'; minSdk 23 }
+    }
+    buildFeatures { buildConfig true }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    signingConfigs {
+        stable {
+            def path = System.getenv('APK_KEYSTORE_PATH')
+            if (path) {
+                storeFile rootProject.file(path)
+                storePassword System.getenv('APK_KEYSTORE_PASSWORD')
+                keyAlias System.getenv('APK_KEY_ALIAS')
+                keyPassword System.getenv('APK_KEY_PASSWORD')
+            }
+        }
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            if (System.getenv('APK_KEYSTORE_PATH')) signingConfig signingConfigs.stable
+        }
+        debug { applicationIdSuffix '.debug' }
+    }
+    lint { abortOnError true }
+}
+
+dependencies {
+    implementation 'androidx.core:core:1.13.1'
+    honorImplementation 'com.google.mlkit:face-detection:16.1.7'
+}
