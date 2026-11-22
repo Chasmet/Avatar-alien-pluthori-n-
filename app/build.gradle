@@ -46,3 +46,9 @@ dependencies {
     implementation 'androidx.core:core:1.13.1'
     honorImplementation 'com.google.mlkit:face-detection:16.1.7'
 }
+
+configurations.configureEach {
+    resolutionStrategy.force 'org.jetbrains.kotlin:kotlin-stdlib:1.8.22',
+            'org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.22',
+            'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.22'
+}
