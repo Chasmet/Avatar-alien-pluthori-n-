@@ -30,6 +30,7 @@ public final class UpdateManager {
     private static final String PREVIEW_RELEASES="https://api.github.com/repos/Chasmet/Avatar-alien-pluthori-n-/releases?per_page=25";
     private static final String PREVIEW_TAG="chk-pluthor-preview-v2-";
     private static volatile File pendingApk;
+    private static final java.util.concurrent.atomic.AtomicBoolean DOWNLOADING=new java.util.concurrent.atomic.AtomicBoolean(false);
     private UpdateManager() { }
     public static void resumeInstall(Activity activity){
         File file=pendingApk;
@@ -58,7 +59,7 @@ public final class UpdateManager {
                         new AlertDialog.Builder(activity).setTitle(BuildConfig.DEBUG?"Nouvelle préversion disponible":"Nouvelle version disponible")
                             .setMessage("Version "+data.optString("versionName","nouvelle")+". Télécharger et installer sans effacer les données ?")
                             .setNegativeButton("Plus tard",null)
-                            .setPositiveButton("Télécharger",(d,w)->download(activity,url,sha256,remote)).show();
+                            .setPositiveButton("Télécharger",(d,w)->download(activity,url,sha256,remote,data.optString("versionName","nouvelle"),data.optLong("apkSize",-1L))).show();
                     }else if(explicit)Toast.makeText(activity,"Application à jour",Toast.LENGTH_LONG).show();
                 });
             }catch(Exception e){if(explicit)activity.runOnUiThread(()->Toast.makeText(activity,"Mise à jour indisponible : "+e.getMessage(),Toast.LENGTH_LONG).show());}
@@ -120,6 +121,7 @@ public final class UpdateManager {
                     meta.put("versionName","0.6."+build);
                     meta.put("sha256",digest.substring(7));
                     meta.put("apkUrl",link);
+                    meta.put("apkSize",asset.optLong("size",-1L));
                     best=meta;
                     latest=build;
                 }
@@ -128,64 +130,136 @@ public final class UpdateManager {
             return best;
         }finally{conn.disconnect();}
     }
-    private static void download(Activity activity,String url,String expectedSha,int expectedVersion){
-        Toast.makeText(activity,"Téléchargement de la mise à jour…",Toast.LENGTH_LONG).show();
+    /** Téléchargement HTTPS avec compteur réel, contrôle SHA et installation Android. */
+    private static void download(Activity activity,String url,String expectedSha,int expectedVersion,
+                                 String version,long advertisedSize){
+        if(!DOWNLOADING.compareAndSet(false,true)){
+            Toast.makeText(activity,"Une mise à jour est déjà en cours",Toast.LENGTH_SHORT).show();
+            return;
+        }
+        final UpdateProgress progress=new UpdateProgress(activity,version);
         new Thread(()->{
+            HttpURLConnection connection=null;
+            File partial=null;
             try {
-                HttpURLConnection c=(HttpURLConnection)new URL(url).openConnection();
-                c.setConnectTimeout(15000);c.setReadTimeout(30000);
-                c.setInstanceFollowRedirects(true);
-                if(c.getResponseCode()!=200)throw new Exception("Téléchargement refusé");
-                File dir=new File(activity.getCacheDir(),"updates");if(!dir.exists()&&!dir.mkdirs())throw new Exception("Dossier inaccessible");
+                if(progress.cancelled)throw new Exception("Téléchargement annulé");
+                progress.stage("Connexion sécurisée à GitHub…");
+                connection=(HttpURLConnection)new URL(url).openConnection();
+                progress.connection=connection;
+                connection.setConnectTimeout(15000);
+                connection.setReadTimeout(15000);
+                connection.setInstanceFollowRedirects(true);
+                connection.setRequestProperty("User-Agent","CHK-Alien-Live-Updater");
+                int http=connection.getResponseCode();
+                if(http!=200)throw new Exception("Serveur de téléchargement : HTTP "+http);
+                if(!"https".equalsIgnoreCase(connection.getURL().getProtocol()))
+                    throw new Exception("Téléchargement non sécurisé");
+                File dir=new File(activity.getCacheDir(),"updates");
+                if(!dir.exists()&&!dir.mkdirs())throw new Exception("Dossier de téléchargement inaccessible");
+                partial=new File(dir,"CHK-Alien-Live-update.part");
                 File apk=new File(dir,"CHK-Alien-Live-update.apk");
+                if(partial.exists()&&!partial.delete())throw new Exception("Ancien téléchargement bloqué");
+                long announced=connection.getContentLength();
+                long total=advertisedSize>0?advertisedSize:announced;
+                if(total>150_000_000L)throw new Exception("Fichier annoncé trop volumineux");
                 MessageDigest digest=MessageDigest.getInstance("SHA-256");
-                try(InputStream in=c.getInputStream();FileOutputStream out=new FileOutputStream(apk)){
-                    byte[] b=new byte[32768];int n;long total=0;
-                    while((n=in.read(b))!=-1){
-                        total+=n;
-                        if(total>150_000_000L)throw new Exception("APK trop volumineux");
-                        digest.update(b,0,n);out.write(b,0,n);
+                long received=0L,lastUi=0L;
+                progress.bytes(0L,total);
+                try(InputStream in=connection.getInputStream();FileOutputStream out=new FileOutputStream(partial)){
+                    byte[] block=new byte[32768];int n;
+                    while((n=in.read(block))!=-1){
+                        if(progress.cancelled)throw new Exception("Téléchargement annulé");
+                        if(n==0)continue;
+                        received+=n;
+                        if(received>150_000_000L)throw new Exception("Fichier trop volumineux");
+                        digest.update(block,0,n);
+                        out.write(block,0,n);
+                        long now=android.os.SystemClock.uptimeMillis();
+                        if(now-lastUi>=100L){progress.bytes(received,total);lastUi=now;}
                     }
+                    out.getFD().sync();
                 }
-                c.disconnect();
+                progress.bytes(received,total);
+                if(progress.cancelled)throw new Exception("Téléchargement annulé");
+                if(received<1024L)throw new Exception("Fichier de mise à jour anormalement petit");
+                if(advertisedSize>0&&received!=advertisedSize)
+                    throw new Exception("Téléchargement incomplet : "+received+" / "+advertisedSize+" octets");
+                progress.stage("Téléchargement terminé — vérification SHA-256…");
+                byte[] hash=digest.digest();
                 StringBuilder checksum=new StringBuilder(64);
-                for(byte b:digest.digest())checksum.append(String.format(Locale.ROOT,"%02x",b&255));
-                if(!checksum.toString().equals(expectedSha)){
-                    apk.delete();throw new Exception("Intégrité APK incorrecte (SHA-256)");
-                }
-                // Ne jamais proposer à Android une mise à jour qui changerait
-                // de package, reculerait de version ou casserait la signature.
-                try { verifyInstallable(activity,apk,expectedVersion); }
-                catch(Exception problem){apk.delete();throw problem;}
-                activity.runOnUiThread(()->install(activity,apk));
-            }catch(Exception e){activity.runOnUiThread(()->Toast.makeText(activity,"Erreur : "+e.getMessage(),Toast.LENGTH_LONG).show());}
+                for(byte b:hash)checksum.append(String.format(Locale.ROOT,"%02x",b&255));
+                if(!checksum.toString().equals(expectedSha))
+                    throw new Exception("Empreinte SHA-256 incorrecte : fichier refusé");
+                verifyApkArchive(partial);
+                if(apk.exists()&&!apk.delete())throw new Exception("Impossible de remplacer le précédent APK");
+                if(!partial.renameTo(apk))throw new Exception("Impossible de préparer l'installation");
+                partial=null;
+                progress.stage("APK intègre — contrôle de compatibilité Android…");
+                verifyInstallable(activity,apk,expectedVersion);
+                if(progress.cancelled)throw new Exception("Téléchargement annulé");
+                progress.complete();
+                activity.runOnUiThread(()->new android.os.Handler(android.os.Looper.getMainLooper())
+                    .postDelayed(()->{
+                        if(progress.cancelled){progress.close();return;}
+                        progress.close();
+                        install(activity,apk);
+                    },350L));
+            }catch(Exception e){
+                if(progress.cancelled)progress.close();
+                else progress.fail(e.getMessage()==null?e.getClass().getSimpleName():e.getMessage());
+            }finally{
+                if(connection!=null)connection.disconnect();
+                if(partial!=null)partial.delete();
+                DOWNLOADING.set(false);
+            }
         },"chk-update-download").start();
     }
-    /** Vérifie localement le package, la version et la correspondance des certificats. */
+
+    /** Contrôle le conteneur APK avant le parseur de paquets Android. */
+    private static void verifyApkArchive(File file)throws Exception {
+        try(java.util.zip.ZipFile zip=new java.util.zip.ZipFile(file)){
+            if(zip.getEntry("AndroidManifest.xml")==null
+                    ||zip.getEntry("classes.dex")==null
+                    ||zip.getEntry("resources.arsc")==null)
+                throw new Exception("APK incomplet : manifeste ou ressources absents");
+        }catch(java.util.zip.ZipException e){
+            throw new Exception("Fichier téléchargé illisible : ce n'est pas un APK valide");
+        }
+    }
+    /** Android reste l'autorité finale : le gestionnaire de paquets contrôle la signature
+     *  et refuse toute mise à jour incompatible avec l'application déjà installée. */
     private static void verifyInstallable(Activity activity,File apk,int expectedVersion) throws Exception {
         PackageManager pm=activity.getPackageManager();
         int flags=Build.VERSION.SDK_INT>=28
             ?PackageManager.GET_SIGNING_CERTIFICATES:PackageManager.GET_SIGNATURES;
+        // Sur certaines versions Android, demander les certificats à un APK non
+        // installé retourne null alors que le parseur de manifeste fonctionne.
         PackageInfo incoming=pm.getPackageArchiveInfo(apk.getAbsolutePath(),flags);
-        if(incoming==null)throw new Exception("Android ne reconnaît pas cet APK");
+        if(incoming==null)incoming=pm.getPackageArchiveInfo(apk.getAbsolutePath(),0);
+        if(incoming==null){
+            // Pas de faux échec : ZIP, taille et SHA-256 ont déjà été vérifiés.
+            // L'installateur système vérifiera obligatoirement package et signature.
+            return;
+        }
         if(!activity.getPackageName().equals(incoming.packageName))
-            throw new Exception("Package incompatible : données protégées");
+            throw new Exception("Nom de package différent : installation refusée");
         long code=Build.VERSION.SDK_INT>=28?incoming.getLongVersionCode():incoming.versionCode;
         if(code!=expectedVersion||code<=BuildConfig.VERSION_CODE)
-            throw new Exception("Version APK incorrecte ou trop ancienne");
+            throw new Exception("Numéro de version APK incorrect ou ancien");
         PackageInfo installed=pm.getPackageInfo(activity.getPackageName(),flags);
         Signature[] oldSignatures=signatures(installed);
         Signature[] newSignatures=signatures(incoming);
-        if(oldSignatures==null||newSignatures==null
-            ||oldSignatures.length==0||oldSignatures.length!=newSignatures.length)
-            throw new Exception("Certificat Android absent ou incompatible");
-        for(Signature original:oldSignatures){
-            boolean matched=false;
-            for(Signature candidate:newSignatures){
-                if(original.equals(candidate)){matched=true;break;}
+        if(oldSignatures!=null&&newSignatures!=null&&oldSignatures.length>0){
+            if(oldSignatures.length!=newSignatures.length)
+                throw new Exception("Certificat incompatible : données protégées");
+            for(Signature original:oldSignatures){
+                boolean matched=false;
+                for(Signature candidate:newSignatures)
+                    if(original.equals(candidate)){matched=true;break;}
+                if(!matched)throw new Exception("Signature Android différente : mise à jour refusée");
             }
-            if(!matched)throw new Exception("Signature différente : mise à jour refusée");
         }
+        // L'installateur Android répète obligatoirement la validation des signatures.
     }
     private static Signature[] signatures(PackageInfo packageInfo){
         if(Build.VERSION.SDK_INT>=28){

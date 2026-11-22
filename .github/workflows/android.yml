@@ -59,12 +59,34 @@ jobs:
           python3 tools/verify_source.py
           python3 tools/verify_glb.py
           python3 tools/verify_visual_fidelity.py
+          python3 tools/verify_majauto.py
           javac tools/ParseJavaSources.java
           java -cp tools ParseJavaSources
       - name: Build Honor 200 (ML Kit local)
         run: bash ./gradlew --no-daemon --stacktrace assembleHonorDebug assembleHonorRelease
       - name: Build compatibilite Android 21
         run: bash ./gradlew --no-daemon --stacktrace assembleCompatDebug
+      - name: Vérifier les APK préversion avant publication MAJAUTO
+        shell: bash
+        run: |
+          set -euo pipefail
+          HONOR="app/build/outputs/apk/honor/debug/app-honor-debug.apk"
+          COMPAT="app/build/outputs/apk/compat/debug/app-compat-debug.apk"
+          AAPT="$ANDROID_HOME/build-tools/34.0.0/aapt"
+          SIGNER="$ANDROID_HOME/build-tools/34.0.0/apksigner"
+          for APK in "$HONOR" "$COMPAT"; do
+            test -s "$APK"
+            unzip -tqq "$APK"
+            "$AAPT" dump badging "$APK" | grep "package: name='fr.chk.alienlive.preview'"
+            "$AAPT" list "$APK" | grep '^AndroidManifest.xml$'
+            "$AAPT" list "$APK" | grep '^classes.dex$'
+          done
+          "$SIGNER" verify --min-sdk-version 23 --print-certs "$HONOR"
+          "$SIGNER" verify --min-sdk-version 21 --print-certs "$COMPAT"
+          H_CODE=$("$AAPT" dump badging "$HONOR" | head -1 | sed -E "s/.*versionCode='([0-9]+)'.*/\1/")
+          C_CODE=$("$AAPT" dump badging "$COMPAT" | head -1 | sed -E "s/.*versionCode='([0-9]+)'.*/\1/")
+          test -n "$H_CODE" && test "$H_CODE" = "$C_CODE"
+          echo "APK ZIP, package, version et signature contrôlés"
       - name: Verifier le package
         run: |
           test -s app/build/outputs/apk/honor/release/app-honor-release-unsigned.apk
