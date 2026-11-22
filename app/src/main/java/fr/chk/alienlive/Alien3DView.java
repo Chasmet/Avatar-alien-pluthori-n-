@@ -221,8 +221,6 @@ public final class Alien3DView extends GLSurfaceView {
                     GLES20.glVertexAttribPointer(uvLoc,2,GLES20.GL_FLOAT,false,0,mesh.uvs);
                 } else {
                     GLES20.glDisableVertexAttribArray(uvLoc);
-            GLES20.glDisableVertexAttribArray(mouthMorphLoc);
-            GLES20.glDisableVertexAttribArray(blinkMorphLoc);
                     GLES20.glVertexAttrib2f(uvLoc,0f,0f);
                 }
                 mesh.indices.position(0);
@@ -230,6 +228,8 @@ public final class Alien3DView extends GLSurfaceView {
             }
             GLES20.glDisableVertexAttribArray(positionLoc);
             GLES20.glDisableVertexAttribArray(uvLoc);
+            GLES20.glDisableVertexAttribArray(mouthMorphLoc);
+            GLES20.glDisableVertexAttribArray(blinkMorphLoc);
         }
         private void readModel() throws Exception {
             meshes.clear();
