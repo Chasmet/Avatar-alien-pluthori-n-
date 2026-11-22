@@ -26,6 +26,7 @@ public final class MainActivity extends Activity {
     private boolean voiceRequested=false;
     private View controls,header;
     private boolean animateLips=true;
+    private volatile FaceCalibration activeCalibration;
     private boolean full=false;
     private TextView status,faceDiagnostics;
     private float lastPitchDegrees=0f,eyeLeftOpen=-1f,eyeRightOpen=-1f,smileConfidence=-1f;
@@ -37,9 +38,11 @@ public final class MainActivity extends Activity {
         @Override public void run(){
             float audio=voice!=null&&voice.isRunning()?voice.getLevel():0f;
             float audioMouth=Math.max(0f,Math.min(1f,(audio-.018f)*5.5f));
+            FaceCalibration cal=activeCalibration;
+            float voiceForGlb=cal==null?audioMouth:cal.mouth(audioMouth);
             stage.setVoiceMouth(animateLips?audioMouth:0f);
             boolean recent=android.os.SystemClock.uptimeMillis()-lastFaceMouthAt<450L;
-            float mouth=recent?Math.max(trackedMouth,audioMouth*.55f):audioMouth;
+            float mouth=recent?Math.max(trackedMouth,voiceForGlb*.55f):voiceForGlb;
             model3D.setPose(lastX,lastY,lastRoll,animateLips?mouth:0f);
             lipHandler.postDelayed(this,33L);
         }
@@ -91,9 +94,10 @@ public final class MainActivity extends Activity {
                 runOnUiThread(()->{
                     stage.updatePose(x,y,roll,mouth);
                     lastX=x;lastY=y;lastRoll=roll;
-                    trackedMouth=stage.getMouthLevel();
+                    FaceCalibration cal=activeCalibration;
+                    trackedMouth=cal==null?mouth:cal.mouth(mouth);
                     lastFaceMouthAt=android.os.SystemClock.uptimeMillis();
-                    model3D.setPose(x,y,roll,animateLips?stage.getMouthLevel():0f);
+                    model3D.setPose(x,y,roll,animateLips?trackedMouth:0f);
                     long now=android.os.SystemClock.uptimeMillis();
                     if(now-lastFaceDiagnostic>650L){
                         lastFaceDiagnostic=now;
@@ -105,7 +109,12 @@ public final class MainActivity extends Activity {
                 runOnUiThread(()->{
                     stage.updateExpression(yaw,pitch,leftBlink,rightBlink);
                     lastPitchDegrees=pitch*28f;
-                    model3D.setExpression(yaw,pitch,leftBlink,rightBlink);
+                    FaceCalibration cal=activeCalibration;
+                    float l=cal==null?leftBlink:cal.blink(leftBlink);
+                    float r=cal==null?rightBlink:cal.blink(rightBlink);
+                    if(cal!=null&&!cal.independentEyes){float both=(l+r)*.5f;l=both;r=both;}
+                    model3D.setExpression(cal==null?yaw:cal.head(yaw),
+                        cal==null?pitch:cal.head(pitch),l,r);
                 });
             }
             @Override public void onFacialMeasurements(float leftOpen,float rightOpen,float mouth,float smile){
@@ -165,7 +174,10 @@ public final class MainActivity extends Activity {
         model3D.setVisibility(wanted?View.VISIBLE:View.GONE);
         stage.set3DMode(wanted&&model3DReady);
         model3D.setHeadTracking(AlienData.prefs(this).getBoolean("followHead",true));
-        model3D.setReverseVertical(AlienData.prefs(this).getBoolean("reverseVertical",false));
+        FaceCalibration cal=activeCalibration;
+        model3D.setFaceCalibration(cal);
+        model3D.setReverseVertical(cal!=null?cal.reverseVertical:
+            AlienData.prefs(this).getBoolean("reverseVertical",false));
         model3D.setEyeAnimations(AlienData.prefs(this).getBoolean("animateEyes",true));
         model3D.setBatterySaver(AlienData.prefs(this).getBoolean("saveBattery",false));
         // Ne jamais supprimer la géométrie du GLB original : même silhouette que 0.6.9.
@@ -214,6 +226,9 @@ public final class MainActivity extends Activity {
     @Override protected void onResume(){
         super.onResume();UpdateManager.resumeInstall(this);stage.reload();
         animateLips=AlienData.prefs(this).getBoolean("animateMouth",true);
+        activeCalibration=FaceCalibration.load(this);
+        model3D.setFaceCalibration(activeCalibration);
+        model3D.refreshFaceRig();
         faceDiagnostics.setVisibility(AlienData.prefs(this).getBoolean("faceDiagnostics",false)?View.VISIBLE:View.GONE);
         model3D.onResume();
         lipHandler.removeCallbacks(lipTicker);

@@ -13,6 +13,8 @@ import android.hardware.camera2.CaptureRequest;
 import android.hardware.camera2.params.StreamConfigurationMap;
 import android.media.Image;
 import android.media.ImageReader;
+import android.graphics.SurfaceTexture;
+import android.view.TextureView;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.SystemClock;
@@ -39,6 +41,8 @@ public final class FaceTracker {
     }
     private final Context context;
     private final Listener listener;
+    private final TextureView preview;
+    private Surface previewSurface;
     private final com.google.mlkit.vision.face.FaceDetector detector;
     private final AtomicBoolean busy = new AtomicBoolean();
     private CameraDevice camera;
@@ -55,8 +59,9 @@ public final class FaceTracker {
     private long lastFrame=0, lastFound=0;
     private volatile boolean announced=false;
 
-    public FaceTracker(Context ctx,Listener callback) {
-        context=ctx; listener=callback;
+    public FaceTracker(Context ctx,Listener callback){this(ctx,callback,null);}
+    public FaceTracker(Context ctx,Listener callback,TextureView previewView) {
+        context=ctx; listener=callback;preview=previewView;
         FaceDetectorOptions opts=new FaceDetectorOptions.Builder()
             .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_FAST)
             .setContourMode(FaceDetectorOptions.CONTOUR_MODE_ALL)
@@ -168,13 +173,24 @@ public final class FaceTracker {
     private void configure(){
         if(stopped||camera==null||reader==null)return;
         try{
-            camera.createCaptureSession(Arrays.asList(reader.getSurface()),new CameraCaptureSession.StateCallback(){
+            java.util.List<Surface> surfaces=new java.util.ArrayList<>();
+            surfaces.add(reader.getSurface());
+            if(preview!=null&&preview.isAvailable()){
+                SurfaceTexture tex=preview.getSurfaceTexture();
+                if(tex!=null){
+                    tex.setDefaultBufferSize(reader.getWidth(),reader.getHeight());
+                    previewSurface=new Surface(tex);
+                    surfaces.add(previewSurface);
+                }
+            }
+            camera.createCaptureSession(surfaces,new CameraCaptureSession.StateCallback(){
                 @Override public void onConfigured(CameraCaptureSession s){
                     if(stopped){s.close();return;}
                     session=s;
                     try{
                         CaptureRequest.Builder b=camera.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
                         b.addTarget(reader.getSurface());
+                        if(previewSurface!=null)b.addTarget(previewSurface);
                         b.set(CaptureRequest.CONTROL_AF_MODE,CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_VIDEO);
                         b.set(CaptureRequest.CONTROL_AE_MODE,CaptureRequest.CONTROL_AE_MODE_ON);
                         b.set(CaptureRequest.CONTROL_AE_ANTIBANDING_MODE,CaptureRequest.CONTROL_AE_ANTIBANDING_MODE_AUTO);
@@ -235,6 +251,8 @@ public final class FaceTracker {
         try{if(camera!=null)camera.close();}catch(Exception ignore){}
         camera=null;
         try{if(reader!=null)reader.close();}catch(Exception ignore){}
+        try{if(previewSurface!=null)previewSurface.release();}catch(Exception ignore){}
+        previewSurface=null;
         reader=null;
         if(cameraThread!=null){cameraThread.quitSafely();cameraThread=null;cameraHandler=null;}
         busy.set(false);

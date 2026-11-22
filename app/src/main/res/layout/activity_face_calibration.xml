@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:fillViewport="true" android:background="#070715">
+  <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+      android:padding="14dp" android:orientation="vertical">
+    <TextView android:id="@+id/calTitle" android:layout_width="match_parent"
+        android:layout_height="wrap_content" android:text="Calibration faciale 3D"
+        android:textSize="22sp" android:textColor="#F3E4FF" android:textStyle="bold"
+        android:paddingBottom="8dp"/>
+    <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:text="Visage caméra à gauche, modèle GLB à droite. Déplace G, D et B sur le modèle, puis teste tes yeux et ta bouche. Réglages conservés pour ce personnage."
+        android:textSize="13sp" android:textColor="#D3C6E8" android:paddingBottom="10dp"/>
+    <LinearLayout android:layout_width="match_parent" android:layout_height="240dp"
+        android:orientation="horizontal">
+      <FrameLayout android:layout_width="0dp" android:layout_weight="1"
+          android:layout_height="match_parent" android:layout_marginEnd="5dp"
+          android:background="#202037">
+        <TextureView android:id="@+id/calCamera" android:layout_width="match_parent"
+            android:layout_height="match_parent"/>
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:padding="6dp" android:text="CAMÉRA" android:textStyle="bold"
+            android:textColor="#FFFFFF" android:textSize="11sp"
+            android:background="#88000000"/>
+      </FrameLayout>
+      <FrameLayout android:id="@+id/calGlbFrame" android:layout_width="0dp"
+          android:layout_weight="1" android:layout_height="match_parent"
+          android:layout_marginStart="5dp" android:background="#202037"/>
+    </LinearLayout>
+    <TextView android:id="@+id/calDiagnostics"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:text="Initialisation de la caméra et du personnage 3D…"
+        android:textColor="#9EE9F7" android:textSize="12sp" android:padding="10dp"
+        android:background="#211A36"/>
+    <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:text="Mode de calibration" android:layout_marginTop="12dp"
+        android:textColor="#E4C8FA" android:textStyle="bold" android:textSize="16sp"/>
+    <RadioGroup android:id="@+id/calMode" android:layout_width="match_parent"
+        android:layout_height="wrap_content" android:orientation="vertical">
+      <RadioButton android:id="@+id/calAuto" android:layout_width="match_parent"
+          android:layout_height="wrap_content" android:text="Auto : repères estimés"
+          android:textColor="#FFFFFF" android:buttonTint="#C292FA"/>
+      <RadioButton android:id="@+id/calManual" android:layout_width="match_parent"
+          android:layout_height="wrap_content" android:text="Manuel : repères déplacés"
+          android:textColor="#FFFFFF" android:buttonTint="#C292FA"/>
+      <RadioButton android:id="@+id/calHybrid" android:layout_width="match_parent"
+          android:layout_height="wrap_content" android:text="Hybride : détection caméra + correction manuelle"
+          android:textColor="#FFFFFF" android:buttonTint="#C292FA"/>
+    </RadioGroup>
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="horizontal" android:gravity="center_vertical">
+      <Button android:id="@+id/calNeutral" android:layout_width="0dp"
+          android:layout_weight="1" android:layout_height="52dp"
+          android:text="Visage neutre" android:textAllCaps="false"/>
+      <Button android:id="@+id/calMouthOpen" android:layout_width="0dp"
+          android:layout_weight="1" android:layout_height="52dp"
+          android:text="Bouche ouverte" android:textAllCaps="false"/>
+      <Button android:id="@+id/calBlinkTest" android:layout_width="0dp"
+          android:layout_weight="1" android:layout_height="52dp"
+          android:text="Test yeux" android:textAllCaps="false"/>
+    </LinearLayout>
+    <TextView android:id="@+id/calCaptureNote"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:text="Les tests enregistrent les valeurs réellement vues par la caméra."
+        android:textColor="#BFB5D2" android:textSize="12sp" android:padding="5dp"/>
+    <LinearLayout android:id="@+id/calSliders" android:layout_width="match_parent"
+        android:layout_height="wrap_content" android:orientation="vertical"
+        android:paddingTop="8dp"/>
+    <Switch android:id="@+id/calIndependent" android:layout_width="match_parent"
+        android:layout_height="54dp" android:text="Cligner chaque œil séparément"
+        android:textColor="#FFFFFF" android:checked="true"/>
+    <Switch android:id="@+id/calReverse" android:layout_width="match_parent"
+        android:layout_height="54dp" android:text="Inverser haut / bas de la tête"
+        android:textColor="#FFFFFF"/>
+    <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:text="Test : lève puis baisse la tête. Le modèle doit regarder dans le même sens. Le mouvement est lissé pour éviter les saccades."
+        android:paddingTop="8dp" android:paddingBottom="10dp"
+        android:textColor="#D5C5E4" android:textSize="12sp"/>
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="horizontal">
+      <Button android:id="@+id/calReset" android:layout_width="0dp"
+          android:layout_height="55dp" android:layout_weight="1"
+          android:text="Réinitialiser" android:textAllCaps="false"/>
+      <Button android:id="@+id/calSave" android:layout_width="0dp"
+          android:layout_height="55dp" android:layout_weight="2"
+          android:text="Enregistrer pour ce GLB" android:textAllCaps="false"
+          android:backgroundTint="#7546AB" android:textColor="#FFFFFF"/>
+    </LinearLayout>
+  </LinearLayout>
+</ScrollView>

@@ -14,7 +14,8 @@ final class GlbFaceAutoRig {
         float dx=(x-cx)/Math.max(.00001f,rx),dy=(y-cy)/Math.max(.00001f,ry);
         return (float)Math.exp(-(dx*dx+dy*dy)*2.2f);
     }
-    static Face fromPositions(float[] p){
+    static Face fromPositions(float[] p){return fromPositions(p,null);}
+    static Face fromPositions(float[] p,FaceCalibration cal){
         if(p.length<300)return new Face(new float[p.length],new float[p.length]);
         float minX=Float.POSITIVE_INFINITY,minY=minX,minZ=minX;
         float maxX=Float.NEGATIVE_INFINITY,maxY=maxX,maxZ=maxX;
@@ -30,15 +31,18 @@ final class GlbFaceAutoRig {
               depth=Math.max(.01f,maxZ-minZ),cx=(minX+maxX)*.5f;
         // Estimation de zones frontales à partir des proportions d'un buste vertical.
         // Pas une reconnaissance anatomique : un export facial riggé est meilleur.
-        float mouthY=minY+height*.54f,eyeY=minY+height*.705f;
+        float[] left=cal==null?new float[]{.375f,.705f}:cal.effectivePoint(0);
+        float[] right=cal==null?new float[]{.625f,.705f}:cal.effectivePoint(1);
+        float[] mouth=cal==null?new float[]{.5f,.54f}:cal.effectivePoint(2);
+        float mouthY=minY+height*mouth[1],mouthX=minX+width*mouth[0];
         float[] lip=new float[p.length],blink=new float[p.length];
         for(int i=0;i<p.length;i+=3){
             float x=p[i],y=p[i+1],z=p[i+2];
             // Exclure la surface arrière et les vêtements.
             float front=Math.max(0f,Math.min(1f,(z-minZ-depth*.47f)/(depth*.34f)));
-            float mid=gaussian(x,y,cx,mouthY,width*.205f,height*.045f)*front;
-            float l=gaussian(x,y,cx-width*.13f,eyeY,width*.125f,height*.036f);
-            float r=gaussian(x,y,cx+width*.13f,eyeY,width*.125f,height*.036f);
+            float mid=gaussian(x,y,mouthX,mouthY,width*.205f,height*.045f)*front;
+            float l=gaussian(x,y,minX+width*left[0],minY+height*left[1],width*.125f,height*.036f);
+            float r=gaussian(x,y,minX+width*right[0],minY+height*right[1],width*.125f,height*.036f);
             // Sépare très légèrement les lèvres tout en conservant leur contour original.
             float down=y<mouthY?-1f:.40f;
             lip[i+1]=mid*height*.012f*down;

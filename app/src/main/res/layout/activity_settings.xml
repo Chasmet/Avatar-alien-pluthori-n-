@@ -55,6 +55,14 @@
             android:layout_height="58dp" android:checked="true"
             android:text="Masquer les volumes gris (GLB expérimentaux)"
             android:textColor="#FFFFFF"/>
+        <Button android:id="@+id/openFaceCalibration"
+            android:layout_width="match_parent" android:layout_height="58dp"
+            android:text="Calibrer les yeux, la bouche et la tête (GLB)"
+            android:textAllCaps="false" android:textColor="#FFFFFF"
+            android:backgroundTint="#65419E"/>
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:text="Outil caméra + modèle 3D, repères tactiles, modes automatique, manuel et hybride. Réglage indépendant pour chaque GLB."
+            android:textColor="#CEC2DB" android:paddingBottom="12dp" android:textSize="12sp"/>
         <Switch android:id="@+id/followHead" android:layout_width="match_parent" android:layout_height="56dp"
             android:text="Suivre les mouvements de tête" android:textColor="#FFFFFF" android:checked="true"/>
         <Switch android:id="@+id/reverseVertical" android:layout_width="match_parent"
