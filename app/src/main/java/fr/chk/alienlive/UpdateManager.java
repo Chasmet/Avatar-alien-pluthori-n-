@@ -12,6 +12,7 @@ import android.widget.Toast;
 
 import androidx.core.content.FileProvider;
 import org.json.JSONObject;
+import org.json.JSONArray;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
@@ -23,7 +24,8 @@ import java.util.Locale;
 /** Lecture HTTPS d'un manifeste statique GitHub Release. Installation demandée à l'utilisateur. */
 public final class UpdateManager {
     private static final String META_STABLE="https://raw.githubusercontent.com/Chasmet/Avatar-alien-pluthori-n-/main/update.json";
-    private static final String META_PREVIEW="https://raw.githubusercontent.com/Chasmet/Avatar-alien-pluthori-n-/main/update-preview-v2.json";
+    private static final String PREVIEW_RELEASES="https://api.github.com/repos/Chasmet/Avatar-alien-pluthori-n-/releases?per_page=25";
+    private static final String PREVIEW_TAG="chk-pluthor-preview-v2-";
     private static volatile File pendingApk;
     private UpdateManager() { }
     public static void resumeInstall(Activity activity){
@@ -37,12 +39,7 @@ public final class UpdateManager {
     public static void check(Activity activity,boolean explicit){
         new Thread(()->{
             try {
-                HttpURLConnection c=(HttpURLConnection)new URL(BuildConfig.DEBUG?META_PREVIEW:META_STABLE).openConnection();
-                c.setConnectTimeout(8000);c.setReadTimeout(8000);c.setRequestProperty("User-Agent","CHK-Alien-Live");
-                int code=c.getResponseCode();
-                if(code!=200)throw new Exception("Canal majauto non publié (HTTP "+code+")");
-                byte[] bytes=read(c.getInputStream(),128000);c.disconnect();
-                JSONObject data=new JSONObject(new String(bytes,"UTF-8"));
+                JSONObject data=BuildConfig.DEBUG?latestPreview():readManifest(META_STABLE);
                 int remote=data.getInt("versionCode");
                 String url=data.getString("apkUrl");
                 if(!activity.getPackageName().equals(data.optString("packageName","")))
@@ -50,7 +47,7 @@ public final class UpdateManager {
                 String sha256=data.optString("sha256","").toLowerCase(Locale.ROOT);
                 if(!sha256.matches("[a-f0-9]{64}"))throw new Exception("Contrôle d'intégrité absent");
                 String allowed=BuildConfig.DEBUG
-                    ?"https://github.com/Chasmet/Avatar-alien-pluthori-n-/releases/download/chk-pluthor-preview-"
+                    ?"https://github.com/Chasmet/Avatar-alien-pluthori-n-/releases/download/chk-pluthor-preview-v2-"
                     :"https://github.com/Chasmet/Avatar-alien-pluthori-n-/releases/download/chk-alien-live-v";
                 if(!url.startsWith(allowed))throw new Exception("URL de version invalide");
                 activity.runOnUiThread(()->{
@@ -63,6 +60,60 @@ public final class UpdateManager {
                 });
             }catch(Exception e){if(explicit)activity.runOnUiThread(()->Toast.makeText(activity,"Mise à jour indisponible : "+e.getMessage(),Toast.LENGTH_LONG).show());}
         },"chk-update-check").start();
+    }
+    private static JSONObject readManifest(String url) throws Exception {
+        HttpURLConnection conn=(HttpURLConnection)new URL(url).openConnection();
+        conn.setConnectTimeout(8000);
+        conn.setReadTimeout(8000);
+        conn.setRequestProperty("User-Agent","CHK-Pluthor-Android");
+        try {
+            if(conn.getResponseCode()!=200)throw new Exception("Canal MAJAUTO HTTP "+conn.getResponseCode());
+            return new JSONObject(new String(read(conn.getInputStream(),128000),"UTF-8"));
+        }finally{conn.disconnect();}
+    }
+    /** Canal preview : lecture directe des Releases GitHub, aucune permission d'écriture API. */
+    private static JSONObject latestPreview() throws Exception {
+        HttpURLConnection conn=(HttpURLConnection)new URL(PREVIEW_RELEASES).openConnection();
+        conn.setConnectTimeout(8000);
+        conn.setReadTimeout(8000);
+        conn.setRequestProperty("User-Agent","CHK-Pluthor-Preview");
+        try {
+            if(conn.getResponseCode()!=200)throw new Exception("Releases GitHub HTTP "+conn.getResponseCode());
+            JSONArray releases=new JSONArray(new String(read(conn.getInputStream(),1500000),"UTF-8"));
+            int latest=-1;
+            JSONObject best=null;
+            for(int i=0;i<releases.length();i++){
+                JSONObject release=releases.optJSONObject(i);
+                if(release==null||!release.optBoolean("prerelease",false))continue;
+                String tag=release.optString("tag_name","");
+                if(!tag.startsWith(PREVIEW_TAG))continue;
+                String number=tag.substring(PREVIEW_TAG.length());
+                if(!number.matches("[0-9]{1,7}"))continue;
+                int build=Integer.parseInt(number);
+                if(build<=latest)continue;
+                JSONArray assets=release.optJSONArray("assets");
+                if(assets==null)continue;
+                for(int n=0;n<assets.length();n++){
+                    JSONObject asset=assets.optJSONObject(n);
+                    if(asset==null||!"app-honor-debug.apk".equals(asset.optString("name")))continue;
+                    String link=asset.optString("browser_download_url","");
+                    String digest=asset.optString("digest","");
+                    if(!digest.matches("sha256:[a-fA-F0-9]{64}"))continue;
+                    String expected="https://github.com/Chasmet/Avatar-alien-pluthori-n-/releases/download/"+tag+"/app-honor-debug.apk";
+                    if(!expected.equals(link))continue;
+                    JSONObject meta=new JSONObject();
+                    meta.put("packageName","fr.chk.alienlive.preview");
+                    meta.put("versionCode",20000+build);
+                    meta.put("versionName","0.6."+build);
+                    meta.put("sha256",digest.substring(7));
+                    meta.put("apkUrl",link);
+                    best=meta;
+                    latest=build;
+                }
+            }
+            if(best==null)throw new Exception("Aucune version signée compatible disponible");
+            return best;
+        }finally{conn.disconnect();}
     }
     private static void download(Activity activity,String url,String expectedSha){
         Toast.makeText(activity,"Téléchargement de la mise à jour…",Toast.LENGTH_LONG).show();

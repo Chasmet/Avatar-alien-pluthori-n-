@@ -24,3 +24,7 @@ Quand la clé stable d'origine est indisponible, `.github/workflows/android.yml`
 ### Canal preview v2
 
 Le canal `fr.chk.alienlive.preview` utilise `update-preview-v2.json` et la clé `.preview-signing/debug.jks` générée une seule fois puis conservée dans le cache GitHub Actions (clé de cache `chk-pluthor-preview-signature-v2`). Les compilations refusent de recréer une clé si le cache a expiré et que le manifeste existe. Aucun changement de certificat silencieux. La préversion v2 se distingue de l'ancien paquet expérimental `fr.chk.alienlive.debug` ; installer la préversion v2 ne désinstalle pas l'application stable.
+
+### Mise à jour preview v2 via GitHub Releases
+
+L'application vérifie les tags `chk-pluthor-preview-v2-*` par GET public sur l'API GitHub et lit `assets[].digest` SHA-256 avant d'installer. Une autorisation GitHub Contents write n'est donc plus nécessaire pour publier un manifeste. Le workflow publie uniquement les APK issus du build réussi. Une fois la première version v2 publiée et sa clé conservée en cache, le marqueur de certificat `update-preview-v2.json` est ajouté pour empêcher toute régénération de clé privée si le cache expire.

@@ -50,3 +50,7 @@ Les APK de prévisualisation portent les noms de Release `app-honor-debug.apk` e
 ### Signature vérifiée de la préversion v2
 
 À partir du canal `update-preview-v2.json`, l'application de prévisualisation porte le package `fr.chk.alienlive.preview` et utilise un certificat de débogage distinct de la v0.6.16 (`fr.chk.alienlive.debug`). Le workflow crée une clé JKS dédiée **une seule fois**, la réutilise à chaque compilation et refuse de régénérer un certificat différent si le manifeste v2 existe. Le cache GitHub Actions n'étant pas un coffre de clés permanent, des secrets ou une sauvegarde privée du JKS restent nécessaires pour garantir les mises à jour à très long terme. Le canal historique `fr.chk.alienlive` ne peut être mis à jour sans retrouver son certificat privé d'origine.
+
+### Lecture des versions sans manifeste GitHub à écrire
+
+Le canal de prévisualisation v2 lit désormais directement les Releases GitHub publiques (uniquement les tags `chk-pluthor-preview-v2-*`) et vérifie le SHA-256 fourni avec l'APK. Il n'exige plus qu'un workflow modifie un fichier manifeste via l'API GitHub. Le fichier `update-preview-v2.json` conservé dans le dépôt est un **marqueur public de certificat** : si le cache de la clé privée est perdu, les nouvelles compilations sont bloquées, ce qui empêche la publication d'une mise à jour impossible à installer sur la version existante.
