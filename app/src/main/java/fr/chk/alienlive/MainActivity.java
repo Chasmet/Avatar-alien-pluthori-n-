@@ -28,6 +28,19 @@ public final class MainActivity extends Activity {
     private boolean full=false;
     private TextView status;
     private long lastFaceDiagnostic=0L;
+    private float trackedMouth=0f,lastX=.5f,lastY=.5f,lastRoll=0f;
+    private long lastFaceMouthAt=0L;
+    private final android.os.Handler lipHandler=new android.os.Handler(android.os.Looper.getMainLooper());
+    private final Runnable lipTicker=new Runnable(){
+        @Override public void run(){
+            float audio=voice!=null&&voice.isRunning()?voice.getLevel():0f;
+            float audioMouth=Math.max(0f,Math.min(1f,(audio-.018f)*5.5f));
+            boolean recent=android.os.SystemClock.uptimeMillis()-lastFaceMouthAt<450L;
+            float mouth=recent?Math.max(trackedMouth,audioMouth*.55f):audioMouth;
+            model3D.setPose(lastX,lastY,lastRoll,animateLips?mouth:0f);
+            lipHandler.postDelayed(this,33L);
+        }
+    };
     @Override public void onCreate(Bundle saved){
         super.onCreate(saved);
         setContentView(R.layout.activity_main);
@@ -73,6 +86,9 @@ public final class MainActivity extends Activity {
             @Override public void onPose(float x,float y,float roll,float mouth){
                 runOnUiThread(()->{
                     stage.updatePose(x,y,roll,mouth);
+                    lastX=x;lastY=y;lastRoll=roll;
+                    trackedMouth=stage.getMouthLevel();
+                    lastFaceMouthAt=android.os.SystemClock.uptimeMillis();
                     model3D.setPose(x,y,roll,animateLips?stage.getMouthLevel():0f);
                     long now=android.os.SystemClock.uptimeMillis();
                     if(now-lastFaceDiagnostic>650L){
@@ -159,6 +175,8 @@ public final class MainActivity extends Activity {
         super.onResume();UpdateManager.resumeInstall(this);stage.reload();
         animateLips=AlienData.prefs(this).getBoolean("animateMouth",true);
         model3D.onResume();
+        lipHandler.removeCallbacks(lipTicker);
+        lipHandler.post(lipTicker);
         sync3DMode();
         tracker.setSaver(AlienData.prefs(this).getBoolean("saveBattery",true));
         if(voiceRequested) startVoice();
@@ -182,7 +200,7 @@ public final class MainActivity extends Activity {
             else {voiceRequested=false;status.setText("Autorise le micro pour modifier la voix");}
         }
     }
-    @Override protected void onPause(){tracker.stop();model3D.onPause();if(voice!=null)voice.stop();super.onPause();}
+    @Override protected void onPause(){lipHandler.removeCallbacks(lipTicker);tracker.stop();model3D.onPause();if(voice!=null)voice.stop();super.onPause();}
     @Override protected void onDestroy(){if(voice!=null)voice.stop();super.onDestroy();}
     @Override public void onBackPressed(){if(full)setLive(false);else super.onBackPressed();}
 }
