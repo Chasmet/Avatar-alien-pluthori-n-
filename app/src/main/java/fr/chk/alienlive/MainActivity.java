@@ -27,7 +27,8 @@ public final class MainActivity extends Activity {
     private View controls,header;
     private boolean animateLips=true;
     private boolean full=false;
-    private TextView status;
+    private TextView status,faceDiagnostics;
+    private float lastPitchDegrees=0f,eyeLeftOpen=-1f,eyeRightOpen=-1f,smileConfidence=-1f;
     private long lastFaceDiagnostic=0L;
     private float trackedMouth=0f,lastX=.5f,lastY=.5f,lastRoll=0f;
     private long lastFaceMouthAt=0L;
@@ -62,6 +63,7 @@ public final class MainActivity extends Activity {
         controls=findViewById(R.id.controlPanel);
         header=findViewById(R.id.header);
         status=findViewById(R.id.status);
+        faceDiagnostics=findViewById(R.id.faceDiagnostics);
         findViewById(R.id.buttonLive).setOnClickListener(v->setLive(true));
         findViewById(R.id.buttonAlien).setOnClickListener(v->openLibrary(false));
         findViewById(R.id.buttonScene).setOnClickListener(v->openLibrary(true));
@@ -102,10 +104,35 @@ public final class MainActivity extends Activity {
             @Override public void onExpression(float yaw,float pitch,float leftBlink,float rightBlink){
                 runOnUiThread(()->{
                     stage.updateExpression(yaw,pitch,leftBlink,rightBlink);
-                    model3D.setExpression(yaw,pitch,Math.max(leftBlink,rightBlink));
+                    lastPitchDegrees=pitch*28f;
+                    model3D.setExpression(yaw,pitch,leftBlink,rightBlink);
                 });
             }
-            @Override public void onStatus(String message){runOnUiThread(()->status.setText(message));}
+            @Override public void onFacialMeasurements(float leftOpen,float rightOpen,float mouth,float smile){
+                runOnUiThread(()->{
+                    eyeLeftOpen=leftOpen;eyeRightOpen=rightOpen;smileConfidence=smile;
+                    model3D.setSmile(smile<0f?0f:Math.max(0f,(smile-.25f)/.75f));
+                    if(faceDiagnostics.getVisibility()==View.VISIBLE){
+                        String left=leftOpen<0f?"N/D":Math.round(leftOpen*100f)+"%";
+                        String right=rightOpen<0f?"N/D":Math.round(rightOpen*100f)+"%";
+                        String smileText=smile<0f?"N/D":Math.round(smile*100f)+"%";
+                        faceDiagnostics.setText("VISAGE DÉTECTÉ • Œil G "+left+" • Œil D "+right
+                            +" • Bouche "+Math.round(mouth*100f)+"% • Sourire "+smileText
+                            +" • Haut/bas "+Math.round(lastPitchDegrees)+"°");
+                    }
+                });
+            }
+            @Override public void onStatus(String message){
+                runOnUiThread(()->{
+                    status.setText(message);
+                    if(message.startsWith("Visage non détecté")){
+                        model3D.setSmile(0f);
+                        model3D.setExpression(0f,0f,0f,0f);
+                        if(faceDiagnostics.getVisibility()==View.VISIBLE)
+                            faceDiagnostics.setText("Visage non détecté : replace-toi devant la caméra");
+                    }
+                });
+            }
         });
     }
     private void sync3DMode(){
@@ -138,6 +165,7 @@ public final class MainActivity extends Activity {
         model3D.setVisibility(wanted?View.VISIBLE:View.GONE);
         stage.set3DMode(wanted&&model3DReady);
         model3D.setHeadTracking(AlienData.prefs(this).getBoolean("followHead",true));
+        model3D.setReverseVertical(AlienData.prefs(this).getBoolean("reverseVertical",false));
         model3D.setEyeAnimations(AlienData.prefs(this).getBoolean("animateEyes",true));
         model3D.setBatterySaver(AlienData.prefs(this).getBoolean("saveBattery",false));
         // Ne jamais supprimer la géométrie du GLB original : même silhouette que 0.6.9.
@@ -186,11 +214,12 @@ public final class MainActivity extends Activity {
     @Override protected void onResume(){
         super.onResume();UpdateManager.resumeInstall(this);stage.reload();
         animateLips=AlienData.prefs(this).getBoolean("animateMouth",true);
+        faceDiagnostics.setVisibility(AlienData.prefs(this).getBoolean("faceDiagnostics",false)?View.VISIBLE:View.GONE);
         model3D.onResume();
         lipHandler.removeCallbacks(lipTicker);
         lipHandler.post(lipTicker);
         sync3DMode();
-        tracker.setSaver(AlienData.prefs(this).getBoolean("saveBattery",true));
+        tracker.setSaver(AlienData.prefs(this).getBoolean("saveBattery",false));
         if(voiceRequested) startVoice();
         if(Build.VERSION.SDK_INT>=23&&checkSelfPermission(Manifest.permission.CAMERA)!=PackageManager.PERMISSION_GRANTED){
             requestPermissions(new String[]{Manifest.permission.CAMERA},100);

@@ -30,7 +30,7 @@ import java.util.Arrays;
 
 /** Suivi facial local léger et sans API réseau. Pas de détection labiale fine. */
 public final class FaceTracker {
-    public interface Listener { void onPose(float x,float y,float roll,float mouth); void onStatus(String status); default void onExpression(float yaw,float pitch,float blinkLeft,float blinkRight){} }
+    public interface Listener { void onPose(float x,float y,float roll,float mouth); void onStatus(String status); default void onExpression(float yaw,float pitch,float blinkLeft,float blinkRight){} default void onFacialMeasurements(float leftEyeOpen,float rightEyeOpen,float mouth,float smile){} }
     private final Context context;
     private final Listener listener;
     private HandlerThread thread;
@@ -132,6 +132,7 @@ public final class FaceTracker {
             final float roll=faces[0].pose(FaceDetector.Face.EULER_Z);
             float mouth=estimateMouth(rgb,midpoint,faces[0].eyesDistance());
             listener.onPose(x,y,roll,mouth);
+            listener.onFacialMeasurements(-1f,-1f,mouth,-1f);
         }
         rgb.recycle();
     }

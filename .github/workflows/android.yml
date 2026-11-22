@@ -58,6 +58,14 @@ jobs:
         run: |
           python3 tools/generate_alien_hd.py
           python3 tools/verify_glb_hd.py
+      - name: Générer les 4 décors supplémentaires et tester le suivi facial
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m venv .scene-venv
+          .scene-venv/bin/python -m pip install Pillow==11.3.0
+          .scene-venv/bin/python tools/generate_live_scenes.py
+          .scene-venv/bin/python tools/verify_face_scenes.py
       - name: Verifier les fichiers sources
         run: |
           python3 tools/verify_source.py
@@ -107,8 +115,9 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
           git add app/src/main/assets/pluthorien_alpha_hd.glb app/src/main/assets/pluthorien_sage_hd.glb app/src/main/assets/pluthorien_guard_hd.glb app/src/main/assets/pluthorien_shadow_hd.glb app/src/main/assets/pluthorien_annunaki_hd.glb
+          git add app/src/main/res/drawable-nodpi/scene_crystal_cavern.jpg app/src/main/res/drawable-nodpi/scene_bioluminescent_forest.jpg app/src/main/res/drawable-nodpi/scene_orbital_city.jpg app/src/main/res/drawable-nodpi/scene_two_moons.jpg
           if ! git diff --cached --quiet; then
-            git commit -m "assets: five HD alien GLB with visemes and original portrait textures [skip ci]"
+            git commit -m "assets: preserve five HD GLB rigs and four generated living scenes [skip ci]"
             git push origin HEAD:main
           fi
       - uses: actions/upload-artifact@v4

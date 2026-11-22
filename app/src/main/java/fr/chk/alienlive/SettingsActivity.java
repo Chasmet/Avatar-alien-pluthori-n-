@@ -14,6 +14,8 @@ public final class SettingsActivity extends Activity {
         setup(R.id.autoUpdate,"autoUpdate",true);
         setup(R.id.batterySaver,"saveBattery",false);
         setup(R.id.followHead,"followHead",true);
+        setup(R.id.reverseVertical,"reverseVertical",false);
+        setup(R.id.faceDiagnosticsToggle,"faceDiagnostics",false);
         setup(R.id.animateEyes,"animateEyes",true);
         setup(R.id.animatedWeather,"animatedWeather",true);
         setup(R.id.animateMouth,"animateMouth",true);

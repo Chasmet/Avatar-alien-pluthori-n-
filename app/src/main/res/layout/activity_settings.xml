@@ -57,6 +57,14 @@
             android:textColor="#FFFFFF"/>
         <Switch android:id="@+id/followHead" android:layout_width="match_parent" android:layout_height="56dp"
             android:text="Suivre les mouvements de tête" android:textColor="#FFFFFF" android:checked="true"/>
+        <Switch android:id="@+id/reverseVertical" android:layout_width="match_parent"
+            android:layout_height="58dp" android:checked="false"
+            android:text="Inverser haut / bas (si suivi inversé sur mon téléphone)"
+            android:textColor="#FFFFFF"/>
+        <Switch android:id="@+id/faceDiagnosticsToggle" android:layout_width="match_parent"
+            android:layout_height="58dp" android:checked="false"
+            android:text="Afficher le diagnostic yeux et bouche en direct"
+            android:textColor="#FFFFFF"/>
         <Switch android:id="@+id/animateEyes" android:layout_width="match_parent" android:layout_height="56dp"
             android:text="Clignements et expressions des yeux" android:textColor="#FFFFFF" android:checked="true"/>
         <Switch android:id="@+id/animateMouth" android:layout_width="match_parent" android:layout_height="56dp"

@@ -12,6 +12,11 @@
         android:padding="13dp" android:orientation="vertical" android:background="@drawable/panel">
         <TextView android:id="@+id/status" android:layout_width="match_parent" android:layout_height="wrap_content"
             android:text="Préparation caméra…" android:textColor="#D5C9E7" android:gravity="center" android:textSize="12sp" android:padding="4dp"/>
+        <TextView android:id="@+id/faceDiagnostics" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:visibility="gone"
+            android:text="Test caméra : ouvre les yeux, ferme les yeux, parle et lève la tête"
+            android:textColor="#BCE8EC" android:gravity="center" android:textSize="12sp"
+            android:padding="8dp" android:background="#231C40" />
         <Button android:id="@+id/buttonLive" android:layout_width="match_parent" android:layout_height="50dp"
             android:text="PLEIN ÉCRAN — LIVE" android:background="@drawable/btn_primary" android:textAllCaps="false" android:textColor="#FFFFFF" />
         <Button android:id="@+id/buttonVoice" android:layout_width="match_parent" android:layout_height="50dp"

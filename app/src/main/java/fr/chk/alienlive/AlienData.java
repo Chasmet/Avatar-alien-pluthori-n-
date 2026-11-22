@@ -12,8 +12,15 @@ public final class AlienData {
         "pluthorien_guard_hd.glb", "pluthorien_shadow_hd.glb",
         "pluthorien_annunaki_hd.glb"
     };
-    public static final String[] SCENES = {"Passerelle de Pluthor", "Espace profond", "Monde annunaki", "Décor personnalisé"};
-    public static final int[] BACKGROUNDS = {R.drawable.scene_bridge, R.drawable.scene_space, R.drawable.scene_annunaki, R.drawable.scene_bridge};
+    public static final String[] SCENES = {
+        "Passerelle de Pluthor", "Espace profond", "Monde annunaki", "Décor personnalisé",
+        "Grotte des cristaux", "Forêt bioluminescente", "Cité orbitale", "Désert aux deux lunes"
+    };
+    public static final int[] BACKGROUNDS = {
+        R.drawable.scene_bridge,R.drawable.scene_space,R.drawable.scene_annunaki,R.drawable.scene_bridge,
+        R.drawable.scene_crystal_cavern,R.drawable.scene_bioluminescent_forest,
+        R.drawable.scene_orbital_city,R.drawable.scene_two_moons
+    };
     public static final int CUSTOM_CHARACTER=5;
     public static final int CUSTOM_SCENE=3;
     public static java.io.File file(Context c,boolean scene){

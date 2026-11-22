@@ -35,6 +35,7 @@ public final class FaceTracker {
         void onPose(float x,float y,float roll,float mouth);
         void onStatus(String status);
         default void onExpression(float yaw,float pitch,float blinkLeft,float blinkRight){}
+        default void onFacialMeasurements(float leftEyeOpen,float rightEyeOpen,float mouth,float smile){}
     }
     private final Context context;
     private final Listener listener;
@@ -137,6 +138,12 @@ public final class FaceTracker {
                             listener.onExpression(clampAngle(yaw,36f),clampAngle(pitch,28f),lx,rx);
                             lastFound=SystemClock.uptimeMillis();
                             listener.onPose(px,py,roll,mouth);
+                            Float smile=f.getSmilingProbability();
+                            Float leftOpen=f.getLeftEyeOpenProbability();
+                            Float rightOpen=f.getRightEyeOpenProbability();
+                            listener.onFacialMeasurements(leftOpen==null?-1f:clamp(leftOpen),
+                                rightOpen==null?-1f:clamp(rightOpen),mouth,
+                                smile==null?-1f:clamp(smile));
                             if(!announced){announced=true;listener.onStatus("Visage suivi • lèvres et mouvements actifs");}
                         }else if(now-lastFound>1600L&&announced){
                             announced=false;
