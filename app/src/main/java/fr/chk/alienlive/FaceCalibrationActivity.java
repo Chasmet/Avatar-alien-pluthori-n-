@@ -31,7 +31,7 @@ public final class FaceCalibrationActivity extends Activity {
     private View titleView,instructionsView,optionsView,precisionTools;
     private TextView zoomStatus,pointInfo;
     private FacePointsOverlay points;
-    private boolean focused=false;
+    private boolean focused=false,freezeMotion=true;
     private float step=.005f;
     private final android.os.Handler updateHandler=new android.os.Handler(android.os.Looper.getMainLooper());
     private final Runnable reloadFace=()->{if(glb!=null)glb.refreshFaceRig();};
@@ -145,14 +145,16 @@ public final class FaceCalibrationActivity extends Activity {
         tracker=new FaceTracker(this,new FaceTracker.Listener(){
             @Override public void onPose(float x,float y,float roll,float mouth){
                 detectedMouth=mouth;faceX=x;faceY=y;faceRoll=roll;
-                glb.setPose(x,y,roll,current.mouth(mouth));
+                glb.setPose(focused&&freezeMotion?.5f:x,focused&&freezeMotion?.5f:y,
+                    focused&&freezeMotion?0f:roll,current.mouth(mouth));
                 renderDiagnostics();
             }
             @Override public void onExpression(float yaw,float pitch,float leftBlink,float rightBlink){
                 facePitch=pitch*28f;
                 float a=current.blink(leftBlink),b=current.blink(rightBlink);
                 if(!current.independentEyes){float both=(a+b)*.5f;a=both;b=both;}
-                glb.setExpression(current.head(yaw),current.head(pitch),a,b);
+                glb.setExpression(focused&&freezeMotion?0f:current.head(yaw),
+                    focused&&freezeMotion?0f:current.head(pitch),a,b);
             }
             @Override public void onFacialMeasurements(float left,float right,float mouth,float smile){
                 eyeLeftOpen=left;eyeRightOpen=right;
@@ -177,6 +179,15 @@ public final class FaceCalibrationActivity extends Activity {
 
     private void setupPrecisionUi(){
         findViewById(R.id.calPrecision).setOnClickListener(v->setFocused(!focused));
+        findViewById(R.id.calFreezeMotion).setOnClickListener(v->{
+            freezeMotion=!freezeMotion;
+            ((Button)findViewById(R.id.calFreezeMotion)).setText(
+                freezeMotion?"TÊTE GELÉE":"SUIVI LIVE");
+            if(freezeMotion){
+                glb.setPose(.5f,.5f,0f,current.mouth(detectedMouth));
+                glb.setExpression(0f,0f,0f,0f);
+            }
+        });
         findViewById(R.id.calPrecisionDone).setOnClickListener(v->{
             current.save(this);
             scheduleRigRefresh();
@@ -235,6 +246,7 @@ public final class FaceCalibrationActivity extends Activity {
         instructionsView.setVisibility(enable?View.GONE:View.VISIBLE);
         optionsView.setVisibility(enable?View.GONE:View.VISIBLE);
         precisionTools.setVisibility(enable?View.VISIBLE:View.GONE);
+        findViewById(R.id.calFreezeMotion).setVisibility(enable?View.VISIBLE:View.GONE);
         ((Button)findViewById(R.id.calPrecision)).setText(enable?"RÉGLAGES":"GRAND ÉCRAN");
         // Le mode AUTO n'expose pas les points personnalisés. Lors du passage
         // en précision, activer HYBRIDE sans supprimer la détection ML Kit.
@@ -249,9 +261,9 @@ public final class FaceCalibrationActivity extends Activity {
                 |View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY|View.SYSTEM_UI_FLAG_LAYOUT_STABLE
                 |View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN|View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION;
             getWindow().getDecorView().setSystemUiVisibility(flags);
-            h=getResources().getDisplayMetrics().heightPixels;
-            // Espace occupé uniquement par la scène, aucun bloc de réglage superposé.
-            h=Math.max((int)(470*getResources().getDisplayMetrics().density),h);
+            float density=getResources().getDisplayMetrics().density;
+            h=Math.max((int)(350*density),
+                getResources().getDisplayMetrics().heightPixels-(int)(24*density));
             if(overlay.zoom()<1.25f)overlay.zoomBy(1.6f);
         }else{
             getWindow().getDecorView().setSystemUiVisibility(0);
