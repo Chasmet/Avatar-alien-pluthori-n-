@@ -8,6 +8,9 @@
         android:paddingTop="7dp" android:paddingBottom="12dp"
         android:text="Les images sont conservées uniquement sur le téléphone. Un simple portrait reste une image 2D : le suivi précis attend un modèle facial animé."
         android:textSize="12sp" android:textColor="#CBC1DD" />
+    <Button android:id="@+id/toggleAvatar3D" android:layout_width="match_parent"
+        android:layout_height="56dp" android:visibility="gone" android:textAllCaps="false"
+        android:text="Activer le modèle GLB 3D pour ce personnage" />
     <GridView android:id="@+id/gallery" android:layout_width="match_parent" android:layout_height="0dp"
         android:layout_weight="1" android:numColumns="2" android:horizontalSpacing="10dp" android:verticalSpacing="12dp" />
 </LinearLayout>
