@@ -30,7 +30,7 @@ import java.util.Arrays;
 
 /** Suivi facial local léger et sans API réseau. Pas de détection labiale fine. */
 public final class FaceTracker {
-    public interface Listener { void onPose(float x,float y,float roll,float mouth); void onStatus(String status); }
+    public interface Listener { void onPose(float x,float y,float roll,float mouth); void onStatus(String status); default void onExpression(float yaw,float pitch,float blinkLeft,float blinkRight){} }
     private final Context context;
     private final Listener listener;
     private HandlerThread thread;
