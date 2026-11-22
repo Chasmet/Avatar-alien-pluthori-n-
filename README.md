@@ -66,3 +66,12 @@ Le canal de prévisualisation v2 lit désormais directement les Releases GitHub 
 - `tools/verify_visual_fidelity.py` bloque une compilation si le GLB original est altéré ou si ces réglages deviennent actifs par défaut.
 
 Cette correction est un retour à la référence d'apparence, pas une validation photographique de chaque écran : tester sur Honor 200 avant de diffuser.
+
+
+## Améliorations LIVE — lèvres, voix et GLB individuels (22 novembre 2026)
+
+- La bouche 3D réagit à la détection ML Kit **et** au niveau de parole réel du micro (si le moteur vocal est activé). Sans son, aucune animation artificielle ; le mode photo 2D conserve aussi ses animations d'origine.
+- Le moteur de voix locale traite maintenant le signal à 44,1 kHz, sans allouer de nouveau tableau de presets à chaque échantillon ; ajout de filtrage passe-haut, réduction légère du bruit et lissage du niveau servant aux lèvres. Les réglages de voix existants restent disponibles.
+- Les cinq GLB embarqués demeurent : Alpha original par défaut ; Sage, Gardien, Ombre et Annunaki activables **un par un** depuis Personnages sans remplacer les portraits 2D par défaut. Le réglage global de test 3D demeure accessible.
+- MAJAUTO : la Release contient les sommes SHA-256 pour les APK Honor et Compat. Le gestionnaire exploite le digest GitHub ou, en secours, les sommes inscrites dans les notes, puis vérifie le certificat Android avant l'installation. La même signature est obligatoire pour conserver les données.
+- Limites : pas de synchronisation phonétique complète sans blendshapes faciaux ; une application externe ne reçoit pas automatiquement la voix transformée par CHK. Tests visuels et audio nécessaires sur appareil réel.
