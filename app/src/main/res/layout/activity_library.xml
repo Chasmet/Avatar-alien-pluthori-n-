@@ -6,8 +6,16 @@
         android:layout_height="55dp" android:text="Importer une image" android:textAllCaps="false" />
     <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
         android:paddingTop="7dp" android:paddingBottom="12dp"
-        android:text="Les images sont conservées uniquement sur le téléphone. Un simple portrait reste une image 2D : le suivi précis attend un modèle facial animé."
+        android:text="Images et GLB sont conservés sur ton téléphone, même après une mise à jour de l'application. Les modèles GLB sans rig conservent leur géométrie, avec des animations faciales limitées."
         android:textSize="12sp" android:textColor="#CBC1DD" />
+    <Button android:id="@+id/importGlb" android:layout_width="match_parent"
+        android:layout_height="55dp" android:visibility="gone"
+        android:text="Importer un vrai modèle 3D GLB"
+        android:textAllCaps="false"/>
+    <Button android:id="@+id/chooseGlb" android:layout_width="match_parent"
+        android:layout_height="50dp" android:visibility="gone"
+        android:text="Mes modèles 3D — choisir ou retirer"
+        android:textAllCaps="false"/>
     <Button android:id="@+id/toggleAvatar3D" android:layout_width="match_parent"
         android:layout_height="56dp" android:visibility="gone" android:textAllCaps="false"
         android:text="Activer le modèle GLB 3D pour ce personnage" />

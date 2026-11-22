@@ -95,3 +95,12 @@ La compilation génère cinq fichiers GLB **réels** dans `app/src/main/assets/`
 - Le Pluthorien **Alpha original** `pluthorien_alpha.glb` reste le rendu utilisé par défaut. Les quatre autres portraits 2D historiques restent par défaut ; chaque GLB HD s'active individuellement depuis « Personnages », ou via les réglages expérimentaux.
 
 **Limite importante :** une photographie unique ne donne ni profondeur réelle derrière le visage ni capture des expressions. Il s'agit d'une reconstruction 3D procédurale avec face fidèle de face et arrière approximatif, **pas** d'un scan photoréaliste parfait à 360°. Les visèmes sont une animation géométrique guidée par l'ouverture de la bouche, pas une synchronisation phonème par phonème.
+
+## Nouveau : Annunaki 1 et les futurs GLB importés
+
+- Ouvrir **Personnages** > **Importer un vrai modèle 3D GLB**, sélectionner le fichier via Documents. L'application copie et valide le fichier dans son stockage privé.
+- **Mes modèles 3D** permet de sélectionner ou retirer les modèles individuellement, jusqu'à 24 personnages de 65 Mo chacun. Les anciens avatars restent intacts et les imports survivent aux mises à jour APK compatibles avec la signature existante.
+- Le fichier Annunaki 1 transmis possède 221599 sommets, 384000 triangles, une texture multivue et zéro animation/skin. Le moteur découpe les indices 32 bits en blocs compatibles OpenGL ES 2.0 et réduit la résolution GPU des grandes textures pour préserver la mémoire.
+- L'animation automatique non destructive propose de petits mouvements de bouche, de paupières et de regard, une rotation progressive de tête/cou et la respiration. Ces déformations approximatives ne constituent pas une retopologie ou un rig facial authentique.
+- Le décor Annunaki bénéficie de météo évolutive, brume, particules, vaisseaux et nouveaux piliers lumineux animés. L'économie de batterie réduit les effets et FPS.
+- Le GLB optimisé livré dans la conversation possède 7 morph targets et 3 clips glTF. CHK anime en direct surtout l'ouverture de bouche et le clignement, tandis que les clips embarqués restent utilisables par un lecteur compatible. Le fichier uploadé n'est pas inscrit en dur dans GitHub : son import une seule fois via Documents le rend utilisable et durable dans l'app.

@@ -21,6 +21,7 @@ public final class LibraryActivity extends Activity {
     private GridView grid;
     private BaseAdapter adapter;
     private static final int REQUEST_PICK=600;
+    private static final int REQUEST_GLB=601;
     @Override public void onCreate(Bundle state){
         super.onCreate(state);setContentView(R.layout.activity_library);
         scene=getIntent().getBooleanExtra("scenes",false);
@@ -34,6 +35,17 @@ public final class LibraryActivity extends Activity {
         });
         Button modelToggle=findViewById(R.id.toggleAvatar3D);
         if(!scene){
+            Button importGlb=findViewById(R.id.importGlb);
+            Button chooseGlb=findViewById(R.id.chooseGlb);
+            importGlb.setVisibility(View.VISIBLE);
+            chooseGlb.setVisibility(View.VISIBLE);
+            importGlb.setOnClickListener(v->{
+                Intent intent=new Intent(Intent.ACTION_OPEN_DOCUMENT);
+                intent.setType("*/*");
+                intent.addCategory(Intent.CATEGORY_OPENABLE);
+                startActivityForResult(intent,REQUEST_GLB);
+            });
+            chooseGlb.setOnClickListener(v->showGlbLibrary());
             modelToggle.setVisibility(View.VISIBLE);
             refresh3DButton(modelToggle);
             modelToggle.setOnClickListener(v->{
@@ -74,7 +86,9 @@ public final class LibraryActivity extends Activity {
         };
         grid.setAdapter(adapter);
         grid.setOnItemClickListener((p,v,position,id)->{
-            if(position==(scene?AlienData.CUSTOM_SCENE:AlienData.CUSTOM_CHARACTER)&&!AlienData.file(this,scene).exists()){
+            if(position==(scene?AlienData.CUSTOM_SCENE:AlienData.CUSTOM_CHARACTER)
+                    &&!AlienData.file(this,scene).exists()
+                    &&(scene||GlbCollection.selected(this)==null)){
                 Toast.makeText(this,"Importe d'abord une image",Toast.LENGTH_LONG).show();return;
             }
             AlienData.prefs(this).edit().putInt(scene?"scene":"character",position).apply();finish();
@@ -83,7 +97,12 @@ public final class LibraryActivity extends Activity {
     private void refresh3DButton(Button button){
         int character=AlienData.character(this);
         if(character==0){button.setText("Alpha : GLB original conservé");button.setEnabled(false);}
-        else if(character>=AlienData.MODEL_FILES.length){button.setText("Image personnalisée : mode 2D");button.setEnabled(false);}
+        else if(character>=AlienData.MODEL_FILES.length){
+            GlbCollection.Model imported=GlbCollection.selected(this);
+            button.setText(imported==null?"Importer un GLB pour activer la 3D"
+                :"Modèle GLB actif : "+imported.name);
+            button.setEnabled(false);
+        }
         else{
             boolean active=AlienData.prefs(this).getBoolean("model3d_"+character,false);
             button.setEnabled(true);
@@ -93,7 +112,24 @@ public final class LibraryActivity extends Activity {
     }
     @Override protected void onActivityResult(int request,int result,Intent intent){
         super.onActivityResult(request,result,intent);
-        if(request!=REQUEST_PICK||result!=RESULT_OK||intent==null||intent.getData()==null)return;
+        if(result!=RESULT_OK||intent==null||intent.getData()==null)return;
+        if(request==REQUEST_GLB){
+            Uri modelUri=intent.getData();
+            Toast.makeText(this,"Importation du modèle 3D…",Toast.LENGTH_SHORT).show();
+            new Thread(()->{
+                try{
+                    GlbCollection.Model item=GlbCollection.importFile(getApplicationContext(),modelUri);
+                    runOnUiThread(()->{
+                        Toast.makeText(this,item.name+" : modèle GLB ajouté",Toast.LENGTH_LONG).show();
+                        finish();
+                    });
+                }catch(Exception e){runOnUiThread(()->new android.app.AlertDialog.Builder(this)
+                    .setTitle("Import GLB impossible")
+                    .setMessage(e.getMessage()).setPositiveButton("Fermer",null).show());}
+            },"chk-import-glb").start();
+            return;
+        }
+        if(request!=REQUEST_PICK)return;
         final Uri uri=intent.getData();
         final boolean isScene=scene;
         Toast.makeText(this,"Importation locale…",Toast.LENGTH_SHORT).show();
@@ -106,4 +142,44 @@ public final class LibraryActivity extends Activity {
             }catch(Exception error){runOnUiThread(()->Toast.makeText(this,"Importation impossible : "+error.getMessage(),Toast.LENGTH_LONG).show());}
         },"chk-local-import").start();
     }
+    private void showGlbLibrary(){
+        java.util.List<GlbCollection.Model> models=GlbCollection.list(this);
+        if(models.isEmpty()){
+            new android.app.AlertDialog.Builder(this)
+                .setTitle("Mes personnages 3D")
+                .setMessage("Aucun GLB importé. Utilise « Importer un vrai modèle 3D GLB » pour ajouter Annunaki 1 et les prochains personnages créés avec Modéliseur 3D.")
+                .setPositiveButton("Compris",null).show();
+            return;
+        }
+        String[] titles=new String[models.size()];
+        for(int i=0;i<models.size();i++)titles[i]=models.get(i).name;
+        new android.app.AlertDialog.Builder(this)
+            .setTitle("Choisir un modèle 3D")
+            .setItems(titles,(d,position)->{
+                GlbCollection.select(this,models.get(position).id);
+                Toast.makeText(this,models.get(position).name+" sélectionné",Toast.LENGTH_SHORT).show();
+                finish();
+            })
+            .setNeutralButton("Retirer un modèle",(d,w)->showGlbDeletion(models))
+            .setNegativeButton("Annuler",null).show();
+    }
+    private void showGlbDeletion(java.util.List<GlbCollection.Model> models){
+        String[] titles=new String[models.size()];
+        for(int i=0;i<models.size();i++)titles[i]=models.get(i).name;
+        new android.app.AlertDialog.Builder(this)
+            .setTitle("Choisir un modèle à retirer")
+            .setItems(titles,(d,position)->{
+                GlbCollection.Model item=models.get(position);
+                new android.app.AlertDialog.Builder(this)
+                    .setTitle("Retirer "+item.name+" ?")
+                    .setMessage("Seul ce GLB importé sera supprimé de CHK Alien Live ; les autres personnages et tes données resteront conservés.")
+                    .setPositiveButton("Retirer",(confirm,w)->{
+                        GlbCollection.delete(this,item.id);
+                        Toast.makeText(this,"Modèle retiré",Toast.LENGTH_SHORT).show();
+                        finish();
+                    })
+                    .setNegativeButton("Annuler",null).show();
+            }).setNegativeButton("Annuler",null).show();
+    }
+
 }

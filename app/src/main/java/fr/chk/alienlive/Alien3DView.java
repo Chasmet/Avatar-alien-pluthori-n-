@@ -12,6 +12,9 @@ import android.util.Log;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.util.Arrays;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -32,9 +35,11 @@ public final class Alien3DView extends GLSurfaceView {
     private final StageRenderer renderer;
     private volatile float yaw=0f,pitch=0f,roll=0f,mouth=0f,blink=0f,x=.5f,y=.5f;
     private volatile boolean saver=false;
+    private volatile boolean eyesEnabled=true;
     private volatile boolean naturalModel=true;
     // Charge d'abord le véritable modèle historique, non sa reconstruction basse résolution.
     private volatile String activeAsset="pluthorien_alpha.glb";
+    private volatile File activeCustomFile=null;
     private volatile boolean reloadModel=false;
     private boolean framesActive=false;
     private final Runnable frameTicker=new Runnable(){
@@ -62,11 +67,14 @@ public final class Alien3DView extends GLSurfaceView {
     }
     public void setExpression(float yaw,float pitch,float blink){this.yaw=yaw;this.pitch=pitch;this.blink=blink;}
     public void setBatterySaver(boolean enable){saver=enable;}
+    public void setEyeAnimations(boolean enabled){eyesEnabled=enabled;}
     public void setNaturalModel(boolean enable){naturalModel=enable;}
     public void setCharacter(int index,boolean originalAlpha){
         if(index<0||index>=AlienData.MODEL_FILES.length)return;
         String asset=index==0&&originalAlpha?"pluthorien_alpha.glb":AlienData.MODEL_FILES[index];
-        if(!asset.equals(activeAsset)){
+        boolean wasCustom=activeCustomFile!=null;
+        activeCustomFile=null;
+        if(wasCustom||!asset.equals(activeAsset)){
             activeAsset=asset;
             reloadModel=true;
             requestRender();
@@ -74,6 +82,15 @@ public final class Alien3DView extends GLSurfaceView {
             // Après un retour du mode portrait, restaurer la vue 3D déjà chargée.
             post(()->renderer.callback.onReady());
         }
+    }
+    /** Affiche un GLB local importé par l'utilisateur, sans remplacer les avatars intégrés. */
+    public void setCustomModel(File source){
+        if(source==null||!source.isFile())return;
+        File previous=activeCustomFile;
+        if(previous!=null&&previous.equals(source)&&renderer.loaded)return;
+        activeCustomFile=source;
+        reloadModel=true;
+        requestRender();
     }
     @Override public void onResume(){
         super.onResume();framesActive=true;
@@ -92,10 +109,20 @@ public final class Alien3DView extends GLSurfaceView {
         private final List<Mesh> meshes=new ArrayList<>();
         private int program,positionLoc,uvLoc,mvpLoc,baseLoc,texLoc,useTexLoc,lightLoc,lipLoc;
         private int mouthMorphLoc,blinkMorphLoc,mouthMorphWeightLoc,blinkMorphWeightLoc;
+        private int importedLoc,faceLoc,gazeLoc,breathLoc,headMotionLoc;
         private int textureId;
+        private float centerX=0f,centerY=0f,centerZ=0f,customScale=1f;
+        private float faceMinY=0f,faceWidth=1f,faceHeight=1f;
         private volatile boolean loaded;
         private float easedYaw,easedPitch,easedRoll,easedJaw,easedBlink,easedX=.5f,easedY=.5f;
-        private final String VERTEX="attribute vec3 aPos;attribute vec2 aUv;attribute vec3 aMouthMorph;attribute vec3 aBlinkMorph;uniform mat4 uMvp;uniform float uLip;uniform float uMouthWeight;uniform float uBlinkWeight;varying vec2 vUv;varying float vLight;void main(){vec3 pos=aPos+aMouthMorph*uMouthWeight+aBlinkMorph*uBlinkWeight;float region=exp(-32.0*pos.x*pos.x-165.0*(pos.y+0.30)*(pos.y+0.30));pos.y+=uLip*0.022*region;pos.z+=uLip*0.009*region;vUv=aUv;vLight=0.84+0.16*max(0.0,pos.z);gl_Position=uMvp*vec4(pos,1.0);}";
+        private final String VERTEX="attribute vec3 aPos;attribute vec2 aUv;attribute vec3 aMouthMorph;attribute vec3 aBlinkMorph;uniform mat4 uMvp;uniform float uLip;uniform float uMouthWeight;uniform float uBlinkWeight;uniform float uImported;uniform vec4 uFace;uniform vec2 uGaze;uniform float uBreath;uniform vec2 uHeadMotion;varying vec2 vUv;varying float vLight;void main(){vec3 pos=aPos+aMouthMorph*uMouthWeight+aBlinkMorph*uBlinkWeight;if(uImported>.5){float eX=(pos.x-uFace.x)/max(.01,uFace.z);float eY=(pos.y-uFace.y)/max(.01,uFace.w);float le=exp(-100.0*pow(eX+.125,2.0)-950.0*pow(eY-.705,2.0));float re=exp(-100.0*pow(eX-.125,2.0)-950.0*pow(eY-.705,2.0));pos.x+=uGaze.x*(le+re)*uFace.z*.0025;pos.y+=uGaze.y*(le+re)*uFace.w*.0025;pos.y+=uBreath*max(0.0,.35-eY)*uFace.w*.012;
+float neck=smoothstep(.39,.53,eY);float ax=uHeadMotion.x*neck;float ay=uHeadMotion.y*neck;
+vec3 origin=vec3(uFace.x,uFace.y+.40*uFace.w,0.0);vec3 v=pos-origin;
+float c=cos(ax),sn=sin(ax);
+v=vec3(v.x*c+v.z*sn,v.y,-v.x*sn+v.z*c);
+c=cos(ay);sn=sin(ay);
+v=vec3(v.x,v.y*c-v.z*sn,v.y*sn+v.z*c);
+pos=origin+v;}else{float region=exp(-32.0*pos.x*pos.x-165.0*(pos.y+0.30)*(pos.y+0.30));pos.y+=uLip*0.022*region;pos.z+=uLip*0.009*region;}vUv=aUv;vLight=0.86+0.14*max(0.0,pos.z);gl_Position=uMvp*vec4(pos,1.0);}";
         private final String FRAGMENT="precision mediump float;varying vec2 vUv;varying float vLight;uniform sampler2D uTexture;uniform vec4 uBase;uniform float uUseTexture;void main(){vec4 c=uBase;if(uUseTexture>0.5)c*=texture2D(uTexture,vUv);gl_FragColor=vec4(c.rgb*vLight,c.a);}";
         StageRenderer(Context ctx,Status status){context=ctx.getApplicationContext();callback=status;}
         @Override public void onSurfaceCreated(GL10 ignored,EGLConfig cfg){
@@ -113,6 +140,11 @@ public final class Alien3DView extends GLSurfaceView {
                 texLoc=GLES20.glGetUniformLocation(program,"uTexture");
                 useTexLoc=GLES20.glGetUniformLocation(program,"uUseTexture");
                 lipLoc=GLES20.glGetUniformLocation(program,"uLip");
+                importedLoc=GLES20.glGetUniformLocation(program,"uImported");
+                faceLoc=GLES20.glGetUniformLocation(program,"uFace");
+                gazeLoc=GLES20.glGetUniformLocation(program,"uGaze");
+                breathLoc=GLES20.glGetUniformLocation(program,"uBreath");
+                headMotionLoc=GLES20.glGetUniformLocation(program,"uHeadMotion");
                 mouthMorphLoc=GLES20.glGetAttribLocation(program,"aMouthMorph");
                 blinkMorphLoc=GLES20.glGetAttribLocation(program,"aBlinkMorph");
                 mouthMorphWeightLoc=GLES20.glGetUniformLocation(program,"uMouthWeight");
@@ -154,23 +186,41 @@ public final class Alien3DView extends GLSurfaceView {
             easedPitch+=(pitch-easedPitch)*blend;
             easedRoll+=(roll-easedRoll)*blend;
             easedJaw+=(mouth-easedJaw)*(mouth>easedJaw?.66f:.46f);
-            easedBlink+=(blink-easedBlink)*.52f;
+            float t=android.os.SystemClock.uptimeMillis()*.001f;
+            float blinkPulse=(t%4.9f)>4.71f?(float)Math.sin(((t%4.9f)-4.71f)/.19f*3.1415927f):0f;
+            easedBlink+=((eyesEnabled?Math.max(blink,blinkPulse*.93f):0f)-easedBlink)*.52f;
             easedX+=(x-easedX)*blend;
             easedY+=(y-easedY)*blend;
             Matrix.setLookAtM(view,0,0f,0f,3.7f,0f,-.13f,0f,0f,1f,0f);
             Matrix.setIdentityM(root,0);
-            Matrix.translateM(root,0,(easedX-.5f)*.34f,(.5f-easedY)*.23f,0f);
+            boolean imported=activeCustomFile!=null;
+            float breath=(float)Math.sin(t*1.7f);
+            Matrix.translateM(root,0,(easedX-.5f)*.34f,(.5f-easedY)*.23f+(imported?breath*.008f:0f),0f);
+            if(imported){
+                Matrix.rotateM(root,0,(float)Math.sin(t*.38f)*1.65f,0f,0f,1f);
+                Matrix.rotateM(root,0,(float)Math.sin(t*.26f)*1.4f,0f,1f,0f);
+            }
             if(useHead){
-                Matrix.rotateM(root,0,-easedRoll*.75f,0f,0f,1f);
-                Matrix.rotateM(root,0,-easedYaw*27f,0f,1f,0f);
-                Matrix.rotateM(root,0,easedPitch*20f,1f,0f,0f);
+                Matrix.rotateM(root,0,-easedRoll*(imported?.20f:.75f),0f,0f,1f);
+                if(!imported){
+                    Matrix.rotateM(root,0,-easedYaw*27f,0f,1f,0f);
+                    Matrix.rotateM(root,0,easedPitch*20f,1f,0f,0f);
+                }
             }
             GLES20.glUseProgram(program);
+            GLES20.glUniform1f(importedLoc,imported?1f:0f);
+            GLES20.glUniform4f(faceLoc,centerX,faceMinY,faceWidth,faceHeight);
+            GLES20.glUniform2f(gazeLoc,eyesEnabled?((float)Math.sin(t*.67f)*.75f+easedYaw*.15f):0f,
+                eyesEnabled?((float)Math.sin(t*.49f)*.42f+easedPitch*.12f):0f);
+            GLES20.glUniform1f(breathLoc,breath);
+            GLES20.glUniform2f(headMotionLoc,imported&&useHead
+                ?(-easedYaw*.40f+(float)Math.sin(t*.24f)*.018f):0f,
+                imported&&useHead?(easedPitch*.28f+(float)Math.sin(t*.19f)*.013f):0f);
             GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
             GLES20.glBindTexture(GLES20.GL_TEXTURE_2D,textureId);
             GLES20.glUniform1i(texLoc,0);
             for(Mesh mesh:meshes){
-                boolean classic="pluthorien_alpha.glb".equals(activeAsset);
+                boolean classic=!imported&&"pluthorien_alpha.glb".equals(activeAsset);
                 // Tous les volumes d'origine sont préservés dans le mode fidèle.
                 if(!classic&&naturalModel&&!mesh.textured&&!mesh.jaw&&!mesh.volume)continue;
                 Matrix.setIdentityM(local,0);
@@ -185,6 +235,11 @@ public final class Alien3DView extends GLSurfaceView {
                         Matrix.translateM(local,0,0f,.300f,0f);
                     }
                 }
+                if(imported){
+                    // Centre la géométrie réelle du GLB, sans l'étirer ou l'aplatir.
+                    Matrix.translateM(local,0,-centerX*customScale,-centerY*customScale,-centerZ*customScale);
+                    Matrix.scaleM(local,0,customScale,customScale,customScale);
+                }
                 Matrix.multiplyMM(tmp,0,root,0,local,0);
                 float[] vm=new float[16];
                 Matrix.multiplyMM(vm,0,view,0,tmp,0);
@@ -193,7 +248,7 @@ public final class Alien3DView extends GLSurfaceView {
                 GLES20.glUniform4fv(baseLoc,1,mesh.color,0);
                 GLES20.glUniform1f(useTexLoc,mesh.textured?1f:0f);
                 // Déformation locale de la lèvre haute sur les sommets texturés.
-                GLES20.glUniform1f(lipLoc,!classic&&mesh.textured&&!mesh.jaw?easedJaw*.35f:0f);
+                GLES20.glUniform1f(lipLoc,!imported&&!classic&&mesh.textured&&!mesh.jaw?easedJaw*.35f:0f);
                 GLES20.glUniform1f(mouthMorphWeightLoc,mesh.openMorph!=null?easedJaw:0f);
                 GLES20.glUniform1f(blinkMorphWeightLoc,mesh.blinkMorph!=null?easedBlink:0f);
                 if(mesh.openMorph!=null){
@@ -239,9 +294,9 @@ public final class Alien3DView extends GLSurfaceView {
                 textureId=0;
             }
             byte[] bytes;
-            try(InputStream in=context.getAssets().open(activeAsset)){
+            try(InputStream in=activeCustomFile!=null?new FileInputStream(activeCustomFile):context.getAssets().open(activeAsset)){
                 ByteArrayOutputStream out=new ByteArrayOutputStream();byte[] block=new byte[32768];int n;
-                while((n=in.read(block))>=0){out.write(block,0,n);if(out.size()>25_000_000)throw new IllegalArgumentException("Model too large");}
+                while((n=in.read(block))>=0){out.write(block,0,n);if(out.size()>65_000_000)throw new IllegalArgumentException("GLB supérieur à 65 Mo");}
                 bytes=out.toByteArray();
             }
             ByteBuffer file=ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN);
@@ -262,7 +317,15 @@ public final class Alien3DView extends GLSurfaceView {
                 JSONObject v=views.getJSONObject(im.getInt("bufferView"));
                 int offset=dataOffset+v.optInt("byteOffset",0),length=v.getInt("byteLength");
                 if(offset>=0&&length>0&&offset+length<=bytes.length){
-                    Bitmap bitmap=BitmapFactory.decodeByteArray(bytes,offset,length);
+                    BitmapFactory.Options options=new BitmapFactory.Options();
+                    options.inJustDecodeBounds=true;
+                    BitmapFactory.decodeByteArray(bytes,offset,length,options);
+                    options.inJustDecodeBounds=false;
+                    // 4096x2048 d'origine ramené à 2048x1024 pour réduire la mémoire GPU.
+                    options.inSampleSize=1;
+                    while(Math.max(options.outWidth,options.outHeight)/options.inSampleSize>2048)
+                        options.inSampleSize*=2;
+                    Bitmap bitmap=BitmapFactory.decodeByteArray(bytes,offset,length,options);
                     if(bitmap!=null){
                         int[] names=new int[1];GLES20.glGenTextures(1,names,0);textureId=names[0];
                         GLES20.glBindTexture(GLES20.GL_TEXTURE_2D,textureId);
@@ -275,6 +338,7 @@ public final class Alien3DView extends GLSurfaceView {
                     }
                 }
             }
+            if(activeCustomFile!=null)resetCustomBounds();
             for(int i=0;i<nodes.length();i++){
                 JSONObject node=nodes.getJSONObject(i);
                 int meshIndex=node.optInt("mesh",-1);
@@ -289,7 +353,7 @@ public final class Alien3DView extends GLSurfaceView {
                     JSONObject attrs=primitive.getJSONObject("attributes");
                     float[] positions=readFloats(file,dataOffset,views,accessors,attrs.getInt("POSITION"),3);
                     float[] uv=attrs.has("TEXCOORD_0")?readFloats(file,dataOffset,views,accessors,attrs.getInt("TEXCOORD_0"),2):null;
-                    short[] indices=readIndices(file,dataOffset,views,accessors,primitive.getInt("indices"));
+                    int[] indices=readIndices(file,dataOffset,views,accessors,primitive.getInt("indices"));
                     JSONObject pbr=materials.getJSONObject(primitive.optInt("material",0)).getJSONObject("pbrMetallicRoughness");
                     JSONArray colors=pbr.optJSONArray("baseColorFactor");
                     float[] color=new float[]{1f,1f,1f,1f};
@@ -305,31 +369,66 @@ public final class Alien3DView extends GLSurfaceView {
                         if(lipDelta.length!=positions.length||blinkDelta.length!=positions.length)
                             throw new IllegalArgumentException("Blendshapes du visage invalides");
                     }
-                    meshes.add(new Mesh(positions,uv,indices,color,jaw,textured,volume,lipDelta,blinkDelta));
+                    if(activeCustomFile!=null){
+                        if(lipDelta==null||blinkDelta==null){
+                            GlbFaceAutoRig.Face auto=GlbFaceAutoRig.fromPositions(positions);
+                            if(lipDelta==null)lipDelta=auto.mouth;
+                            if(blinkDelta==null)blinkDelta=auto.eyes;
+                        }
+                        updateCustomBounds(positions);
+                    }
+                    for(GlbMeshChunker.Chunk chunk:
+                          GlbMeshChunker.split(positions,uv,indices,lipDelta,blinkDelta)){
+                        meshes.add(new Mesh(chunk.points,chunk.uv,chunk.indices,color,
+                            jaw,textured,volume,chunk.lip,chunk.blink));
+                    }
                 }
             }
+            if(activeCustomFile!=null)finishCustomBounds();
+        }
+        private float minPX,maxPX,minPY,maxPY,minPZ,maxPZ;
+        private void resetCustomBounds(){
+            minPX=minPY=minPZ=Float.POSITIVE_INFINITY;
+            maxPX=maxPY=maxPZ=Float.NEGATIVE_INFINITY;
+        }
+        private void updateCustomBounds(float[] p){
+            for(int i=0;i<p.length;i+=3){
+                minPX=Math.min(minPX,p[i]);maxPX=Math.max(maxPX,p[i]);
+                minPY=Math.min(minPY,p[i+1]);maxPY=Math.max(maxPY,p[i+1]);
+                minPZ=Math.min(minPZ,p[i+2]);maxPZ=Math.max(maxPZ,p[i+2]);
+            }
+        }
+        private void finishCustomBounds(){
+            centerX=(minPX+maxPX)*.5f;
+            centerY=(minPY+maxPY)*.5f;
+            centerZ=(minPZ+maxPZ)*.5f;
+            faceMinY=minPY;
+            faceWidth=Math.max(.001f,maxPX-minPX);
+            faceHeight=Math.max(.001f,maxPY-minPY);
+            float extent=Math.max(faceHeight,faceWidth*1.2f);
+            customScale=extent>.001f?Math.min(9f,2.15f/extent):1f;
         }
         private float[] readFloats(ByteBuffer source,int base,JSONArray views,JSONArray accessors,int id,int components)throws Exception{
             JSONObject a=accessors.getJSONObject(id),v=views.getJSONObject(a.getInt("bufferView"));
             if(a.getInt("componentType")!=5126)throw new IllegalArgumentException("Unsupported float accessor");
             int count=a.getInt("count"),stride=v.optInt("byteStride",components*4);
             int offset=base+v.optInt("byteOffset",0)+a.optInt("byteOffset",0);
-            if(count<1||count>100000||offset+(count-1)*stride+components*4>source.capacity())throw new IllegalArgumentException("GLB float out of bounds");
+            if(count<1||count>600000||offset<0||offset+(long)(count-1)*stride+components*4>source.capacity())throw new IllegalArgumentException("GLB float out of bounds");
             float[] result=new float[count*components];
             for(int i=0;i<count;i++)for(int j=0;j<components;j++)result[i*components+j]=source.getFloat(offset+i*stride+j*4);
             return result;
         }
-        private short[] readIndices(ByteBuffer source,int base,JSONArray views,JSONArray accessors,int id)throws Exception{
+        private int[] readIndices(ByteBuffer source,int base,JSONArray views,JSONArray accessors,int id)throws Exception{
             JSONObject a=accessors.getJSONObject(id),v=views.getJSONObject(a.getInt("bufferView"));
             int count=a.getInt("count"),type=a.getInt("componentType"),size=type==5125?4:(type==5123?2:1);
             int stride=v.optInt("byteStride",size),offset=base+v.optInt("byteOffset",0)+a.optInt("byteOffset",0);
-            if(count<3||count>300000||offset+(count-1)*stride+size>source.capacity())throw new IllegalArgumentException("GLB indices hors limite");
-            short[] result=new short[count];
+            if(count<3||count>3000000||offset<0||offset+(long)(count-1)*stride+size>source.capacity())throw new IllegalArgumentException("GLB indices hors limite");
+            int[] result=new int[count];
             for(int i=0;i<count;i++){
                 int p=offset+i*stride;
                 long value=type==5125?(source.getInt(p)&0xffffffffL):(type==5123?(source.getShort(p)&0xffff):(source.get(p)&255));
-                if(value>65535)throw new IllegalArgumentException("GLB nécessite des index >16 bits");
-                result[i]=(short)value;
+                if(value>Integer.MAX_VALUE)throw new IllegalArgumentException("Index GLB hors limites");
+                result[i]=(int)value;
             }
             return result;
         }

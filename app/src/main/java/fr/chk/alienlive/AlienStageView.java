@@ -129,7 +129,7 @@ public final class AlienStageView extends View {
             labelPaint.setTextAlign(Paint.Align.CENTER);
             labelPaint.setTextSize(14f*getResources().getDisplayMetrics().scaledDensity);
             labelPaint.setColor(0xFFF2E9FF);
-            c.drawText(AlienData.NAMES[AlienData.character(getContext())],w/2f,h-67,labelPaint);
+            c.drawText((AlienData.character(getContext())==AlienData.CUSTOM_CHARACTER&&GlbCollection.selected(getContext())!=null?GlbCollection.activeName(getContext()):AlienData.NAMES[AlienData.character(getContext())]),w/2f,h-67,labelPaint);
             labelPaint.setTextSize(11f*getResources().getDisplayMetrics().scaledDensity);
             labelPaint.setColor(0xFFE4CCE8);
             c.drawText(animate?"Atmosphère : "+atmosphere.currentWeather(selectedMode,selectedScene):"Atmosphère désactivée",w/2f,h-40,labelPaint);
