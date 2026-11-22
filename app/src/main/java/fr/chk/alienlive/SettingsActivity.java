@@ -58,6 +58,8 @@ public final class SettingsActivity extends Activity {
             @Override public void onStopTrackingTouch(SeekBar bar) { }
         });
         findViewById(R.id.checkUpdate).setOnClickListener(v->UpdateManager.check(this,true));
+        findViewById(R.id.openFaceCalibration).setOnClickListener(
+            v->startActivity(new android.content.Intent(this,FaceCalibrationActivity.class)));
         ((TextView)findViewById(R.id.version)).setText("Version "+BuildConfig.VERSION_NAME+" ("+BuildConfig.VERSION_CODE+")");
     }
     @Override protected void onResume(){
