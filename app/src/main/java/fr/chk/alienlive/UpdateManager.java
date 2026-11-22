@@ -198,10 +198,12 @@ public final class UpdateManager {
                 verifyInstallable(activity,apk,expectedVersion);
                 if(progress.cancelled)throw new Exception("Téléchargement annulé");
                 progress.complete();
-                activity.runOnUiThread(()->{
-                    progress.close();
-                    install(activity,apk);
-                });
+                activity.runOnUiThread(()->new android.os.Handler(android.os.Looper.getMainLooper())
+                    .postDelayed(()->{
+                        if(progress.cancelled){progress.close();return;}
+                        progress.close();
+                        install(activity,apk);
+                    },350L));
             }catch(Exception e){
                 if(progress.cancelled)progress.close();
                 else progress.fail(e.getMessage()==null?e.getClass().getSimpleName():e.getMessage());
