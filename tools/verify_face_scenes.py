@@ -39,4 +39,15 @@ for name in ('scene_crystal_cavern','scene_bioluminescent_forest',
     with Image.open(f) as image:
         assert image.size==(720,1280) and image.mode=='RGB',(name,image.size)
     print('OK DECOR',name,f.stat().st_size,'bytes')
+# Camera-positive pitch is compensated by a negative X-axis GLB rotation.
+# For a vertex in front of the neck pivot (z>0), lifting the head must lift y.
+import math
+z=0.5
+pitch=math.radians(12)
+positive_tilt_y=-(z*math.sin(-pitch))
+negative_tilt_y=-(z*math.sin(pitch))
+assert positive_tilt_y>0 and negative_tilt_y<0
+assert 'Matrix.rotateM(root,0,-vertical*20f' in view
+assert '(-vertical*.28f' in view
+print('OK pitch rotation: head up -> model up; head down -> model down')
 print('OK eyes, mouth and corrected pitch; 4 new scenery backgrounds.')
