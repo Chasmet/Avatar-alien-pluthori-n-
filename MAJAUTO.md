@@ -16,3 +16,7 @@ Si les secrets de signature GitHub Actions ne sont pas configurés, la clé rest
 ## Publication automatisée additionnelle (novembre 2026)
 
 Après succès du workflow Android sur main, `.github/workflows/automatic-release.yml` peut signer l'artefact Honor, comparer son certificat SHA-256 à la Release signée v0.6.9, publier un APK dans une nouvelle Release et mettre à jour `update.json` automatiquement. Les secrets requis sont `APK_KEYSTORE_BASE64` (base64 du JKS permanent v0.5.11), `APK_KEYSTORE_PASSWORD`, `APK_KEY_ALIAS`, `APK_KEY_PASSWORD`. Le workflow ne publie **pas** si ces secrets manquent ou si la signature diffère. Le workflow `publish.yml` historique reste disponible pour le canal de reconstruction des APK déjà signés. Aucun APK non signé ne doit être annoncé comme mise à jour installable.
+
+## Canal preview (solution immédiate indépendante)
+
+Quand la clé stable d'origine est indisponible, `.github/workflows/preview.yml` publie une véritable APK debug séparée (applicationId `fr.chk.alienlive.debug`) et un manifeste `update-preview.json`. La même APK préversion recherche ce manifeste et installe les versions suivantes **si la clé DEBUG mise en cache GitHub n'a pas expiré**. Cette clé est réservée aux tests ; la version principale ne change pas de signature et conserve ses données. Le vrai canal stable reste `update.json` et exige toujours le JKS historique. Aucun contournement de signature n'est utilisé.

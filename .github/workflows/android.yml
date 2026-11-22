@@ -11,6 +11,7 @@ on:
       - "gradlew"
       - "tools/**"
       - ".github/workflows/android.yml"
+      - ".github/workflows/preview.yml"
   workflow_dispatch:
 permissions:
   contents: read
@@ -30,6 +31,12 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.7'
+      # Cache de la clé DEBUG uniquement. Jamais utilisée pour l'APK stable.
+      # La même clé permet de mettre à jour la préversion sans la désinstaller.
+      - uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: chk-pluthor-preview-debug-keystore-v1
       - name: Android SDK 34
         run: sdkmanager "platforms;android-34" "build-tools;34.0.0"
       - name: Verifier les fichiers sources

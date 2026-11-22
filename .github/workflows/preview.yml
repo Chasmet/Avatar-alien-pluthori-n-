@@ -23,6 +23,35 @@ jobs:
           gh run download "$SOURCE_RUN" --repo "$GITHUB_REPOSITORY" --name CHK-Alien-Live-Android-Debug --dir "$RUNNER_TEMP/preview"
           test -s "$RUNNER_TEMP/preview/app-honor-debug.apk"
           test -s "$RUNNER_TEMP/preview/app-compat-debug.apk"
+      - name: Préparer le manifest MAJAUTO preview
+        env:
+          SOURCE_RUN: ${{ github.event.workflow_run.id }}
+          SOURCE_NUMBER: ${{ github.event.workflow_run.run_number }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          sdkmanager "build-tools;34.0.0"
+          APK="$RUNNER_TEMP/preview/app-honor-debug.apk"
+          BADGING=$("$ANDROID_HOME/build-tools/34.0.0/aapt" dump badging "$APK" | head -n 1)
+          echo "$BADGING" | grep "package: name='fr.chk.alienlive.debug'"
+          VERSION=$(printf '%s\n' "$BADGING" | sed -n "s/.*versionName='\([^']*\)'.*/\1/p")
+          CODE=$(printf '%s\n' "$BADGING" | sed -n "s/.*versionCode='\([^']*\)'.*/\1/p")
+          test -n "$VERSION" && test -n "$CODE"
+          SHA=$(sha256sum "$APK" | cut -d ' ' -f 1)
+          export VERSION CODE SHA SOURCE_NUMBER
+          python3 - <<'PY'
+          import json,os
+          manifest={
+              "versionCode":int(os.environ["CODE"]),
+              "versionName":os.environ["VERSION"],
+              "packageName":"fr.chk.alienlive.debug",
+              "apkUrl":"https://github.com/Chasmet/Avatar-alien-pluthori-n-/releases/download/chk-pluthor-preview-"+os.environ["SOURCE_NUMBER"]+"/CHK-Pluthor-Honor-Preview.apk",
+              "sha256":os.environ["SHA"]
+          }
+          with open("update-preview.json","w",encoding="utf-8") as f:
+              json.dump(manifest,f,ensure_ascii=False,indent=2)
+              f.write("\n")
+          PY
       - name: Créer des APK de test directement téléchargeables
         env:
           GH_TOKEN: ${{ github.token }}
@@ -44,4 +73,21 @@ jobs:
               --repo "$GITHUB_REPOSITORY" --target "$SOURCE_SHA" --prerelease \
               --title "CHK Pluthor — APK de test $SOURCE_NUMBER" \
               --notes "Prévisualisation avec modèles GLB. APK signés avec la clé de débogage Android et package fr.chk.alienlive.debug : installation en parallèle, sans modifier ni désinstaller l'ancienne application. CE N'EST PAS une mise à jour stable en place."
+          fi
+      - name: Publier le manifeste de mise à jour intégré au mode preview
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          B64=$(base64 -w0 update-preview.json)
+          CURRENT=$(gh api "repos/$GITHUB_REPOSITORY/contents/update-preview.json" --jq .sha 2>/dev/null || true)
+          if [ -n "$CURRENT" ]; then
+            gh api --method PUT "repos/$GITHUB_REPOSITORY/contents/update-preview.json" \
+              -f message="MAJAUTO preview: publication automatique" \
+              -f branch=main -f sha="$CURRENT" -f content="$B64" >/dev/null
+          else
+            gh api --method PUT "repos/$GITHUB_REPOSITORY/contents/update-preview.json" \
+              -f message="MAJAUTO preview: première publication" \
+              -f branch=main -f content="$B64" >/dev/null
           fi

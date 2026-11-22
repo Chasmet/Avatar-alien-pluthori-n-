@@ -22,12 +22,13 @@ import java.util.Locale;
 
 /** Lecture HTTPS d'un manifeste statique GitHub Release. Installation demandée à l'utilisateur. */
 public final class UpdateManager {
-    private static final String META="https://raw.githubusercontent.com/Chasmet/Avatar-alien-pluthori-n-/main/update.json";
+    private static final String META_STABLE="https://raw.githubusercontent.com/Chasmet/Avatar-alien-pluthori-n-/main/update.json";
+    private static final String META_PREVIEW="https://raw.githubusercontent.com/Chasmet/Avatar-alien-pluthori-n-/main/update-preview.json";
     private UpdateManager() { }
     public static void check(Activity activity,boolean explicit){
         new Thread(()->{
             try {
-                HttpURLConnection c=(HttpURLConnection)new URL(META).openConnection();
+                HttpURLConnection c=(HttpURLConnection)new URL(BuildConfig.DEBUG?META_PREVIEW:META_STABLE).openConnection();
                 c.setConnectTimeout(8000);c.setReadTimeout(8000);c.setRequestProperty("User-Agent","CHK-Alien-Live");
                 int code=c.getResponseCode();
                 if(code!=200)throw new Exception("Canal majauto non publié (HTTP "+code+")");
@@ -39,10 +40,13 @@ public final class UpdateManager {
                     throw new Exception("Version incompatible : réinstallation nécessaire");
                 String sha256=data.optString("sha256","").toLowerCase(Locale.ROOT);
                 if(!sha256.matches("[a-f0-9]{64}"))throw new Exception("Contrôle d'intégrité absent");
-                if(!url.startsWith("https://github.com/Chasmet/Avatar-alien-pluthori-n-/releases/download/chk-alien-live-v"))throw new Exception("URL de version invalide");
+                String allowed=BuildConfig.DEBUG
+                    ?"https://github.com/Chasmet/Avatar-alien-pluthori-n-/releases/download/chk-pluthor-preview-"
+                    :"https://github.com/Chasmet/Avatar-alien-pluthori-n-/releases/download/chk-alien-live-v";
+                if(!url.startsWith(allowed))throw new Exception("URL de version invalide");
                 activity.runOnUiThread(()->{
                     if(remote>BuildConfig.VERSION_CODE){
-                        new AlertDialog.Builder(activity).setTitle("Nouvelle version disponible")
+                        new AlertDialog.Builder(activity).setTitle(BuildConfig.DEBUG?"Nouvelle préversion disponible":"Nouvelle version disponible")
                             .setMessage("Version "+data.optString("versionName","nouvelle")+". Télécharger et installer sans effacer les données ?")
                             .setNegativeButton("Plus tard",null)
                             .setPositiveButton("Télécharger",(d,w)->download(activity,url,sha256)).show();
