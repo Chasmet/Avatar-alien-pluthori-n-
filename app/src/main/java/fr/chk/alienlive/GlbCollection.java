@@ -74,7 +74,7 @@ public final class GlbCollection {
             if(cursor!=null&&cursor.moveToFirst())name=cursor.getString(0);
         }catch(Exception ignored){}
         if(name==null||name.trim().isEmpty())name="Personnage importé";
-        name=name.replaceAll("(?i)\\.glb$","").replaceAll("[\\p{Cntrl}\\\\/]+"," ").trim();
+        name=name.replaceAll("(?i)\\.glb(?: \\(\\d+\\))?$","").replaceAll("[\\p{Cntrl}\\\\/]+"," ").trim();
         return name.substring(0,Math.min(60,name.length()));
     }
     private static int getInt(byte[] p,int at){
@@ -143,9 +143,17 @@ public final class GlbCollection {
             JSONObject item=new JSONObject();
             item.put("id",id);item.put("name",title);
             items.put(item);
-            prefs(c).edit().putString(INDEX,items.toString()).putString(SELECTED,id)
+            SharedPreferences.Editor edit=prefs(c).edit()
+                .putString(INDEX,items.toString()).putString(SELECTED,id)
                 .putInt("character",AlienData.CUSTOM_CHARACTER)
-                .putBoolean("useModel3D",true).apply();
+                .putBoolean("useModel3D",true);
+            // Décor annunaki animé proposé à l'importation, sans écraser un décor personnel.
+            if(title.toLowerCase(java.util.Locale.ROOT).contains("annunaki")
+                  &&AlienData.scene(c)==0){
+                edit.putInt("scene",2).putBoolean("animatedWeather",true)
+                    .putInt("weatherMode",0).putInt("weatherIntensity",86);
+            }
+            edit.apply();
             return new Model(id,title,saved);
         }finally{if(staging.exists())staging.delete();}
     }
