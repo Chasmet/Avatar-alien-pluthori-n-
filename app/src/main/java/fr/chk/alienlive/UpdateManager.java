@@ -23,7 +23,7 @@ import java.util.Locale;
 /** Lecture HTTPS d'un manifeste statique GitHub Release. Installation demandée à l'utilisateur. */
 public final class UpdateManager {
     private static final String META_STABLE="https://raw.githubusercontent.com/Chasmet/Avatar-alien-pluthori-n-/main/update.json";
-    private static final String META_PREVIEW="https://raw.githubusercontent.com/Chasmet/Avatar-alien-pluthori-n-/main/update-preview.json";
+    private static final String META_PREVIEW="https://raw.githubusercontent.com/Chasmet/Avatar-alien-pluthori-n-/main/update-preview-v2.json";
     private UpdateManager() { }
     public static void check(Activity activity,boolean explicit){
         new Thread(()->{

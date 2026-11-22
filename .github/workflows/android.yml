@@ -18,6 +18,8 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      PREVIEW_KEYSTORE_PATH: ${{ github.workspace }}/.preview-signing/debug.jks
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
@@ -31,12 +33,25 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.7'
-      # Cache de la clé DEBUG uniquement. Jamais utilisée pour l'APK stable.
-      # La même clé permet de mettre à jour la préversion sans la désinstaller.
+      # Clé de préversion dans un cache séparé, jamais utilisée pour le package stable.
       - uses: actions/cache@v4
+        id: previewKey
         with:
-          path: ~/.android/debug.keystore
-          key: chk-pluthor-preview-debug-keystore-v1
+          path: .preview-signing/debug.jks
+          key: chk-pluthor-preview-signature-v2
+      - name: Sécuriser la clé de signature de la préversion
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .preview-signing
+          if [ ! -s .preview-signing/debug.jks ]; then
+            if [ -f update-preview-v2.json ]; then
+              echo "::error::La clé preview d'origine a expiré du cache ; refus de changer de certificat."
+              exit 1
+            fi
+            keytool -genkeypair -keystore .preview-signing/debug.jks -storepass android -keypass android -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=CHK Pluthor Preview, OU=Studio, O=CHK, C=FR" -noprompt
+          fi
+          test -s .preview-signing/debug.jks
       - name: Android SDK 34
         run: sdkmanager "platforms;android-34" "build-tools;34.0.0"
       - name: Verifier les fichiers sources
@@ -76,7 +91,7 @@ jobs:
           COMPAT="app/build/outputs/apk/compat/debug/app-compat-debug.apk"
           test -s "$APK" && test -s "$COMPAT"
           BADGING=$("$ANDROID_HOME/build-tools/34.0.0/aapt" dump badging "$APK" | head -n 1)
-          echo "$BADGING" | grep "package: name='fr.chk.alienlive.debug'"
+          echo "$BADGING" | grep "package: name='fr.chk.alienlive.preview'"
           VERSION=$(printf '%s\n' "$BADGING" | sed -n "s/.*versionName='\([^']*\)'.*/\1/p")
           CODE=$(printf '%s\n' "$BADGING" | sed -n "s/.*versionCode='\([^']*\)'.*/\1/p")
           test -n "$VERSION" && test -n "$CODE"
@@ -84,9 +99,9 @@ jobs:
           SIGNER=$("$ANDROID_HOME/build-tools/34.0.0/apksigner" verify --print-certs "$APK" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | head -n 1)
           test -n "$SIGNER"
           # Si la clé debug change, refuser une mise à jour qui ne serait pas installable.
-          CURRENT=$(gh api "repos/$GITHUB_REPOSITORY/contents/update-preview.json" --jq .sha 2>/dev/null || true)
+          CURRENT=$(gh api "repos/$GITHUB_REPOSITORY/contents/update-preview-v2.json" --jq .sha 2>/dev/null || true)
           if [ -n "$CURRENT" ]; then
-            PREVIOUS_SIGNER=$(gh api "repos/$GITHUB_REPOSITORY/contents/update-preview.json" --jq .content | base64 -d | python3 -c 'import json,sys;print(json.load(sys.stdin).get("signerSha256",""))')
+            PREVIOUS_SIGNER=$(gh api "repos/$GITHUB_REPOSITORY/contents/update-preview-v2.json" --jq .content | base64 -d | python3 -c 'import json,sys;print(json.load(sys.stdin).get("signerSha256",""))')
             if [ -n "$PREVIOUS_SIGNER" ] && [ "$PREVIOUS_SIGNER" != "$SIGNER" ]; then
               echo "::error::Debug signing certificate changed: a seamless preview update would be rejected."
               exit 1
@@ -98,7 +113,7 @@ jobs:
             gh release create "$TAG" "$APK#CHK-Pluthor-Honor-Preview.apk" "$COMPAT#CHK-Pluthor-Android-Preview.apk" \
               --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease \
               --title "CHK Pluthor — Préversion $VERSION" \
-              --notes "5 aliens GLB articulés. Préversion Android signée, package fr.chk.alienlive.debug ; s'installe en parallèle sans supprimer les données de l'application stable. Son canal MAJAUTO est distinct du canal stable."
+              --notes "5 aliens GLB articulés. Préversion Android signée, package fr.chk.alienlive.preview ; s'installe en parallèle sans supprimer les données de l'application stable. Son canal MAJAUTO est distinct du canal stable."
           fi
           export VERSION CODE TAG SIGNER
           SHA=$(sha256sum "$APK" | cut -d ' ' -f 1)
@@ -108,7 +123,7 @@ jobs:
           result={
             "versionCode":int(os.environ["CODE"]),
             "versionName":os.environ["VERSION"],
-            "packageName":"fr.chk.alienlive.debug",
+            "packageName":"fr.chk.alienlive.preview",
             "apkUrl":"https://github.com/Chasmet/Avatar-alien-pluthori-n-/releases/download/"+os.environ["TAG"]+"/app-honor-debug.apk",
             "sha256":os.environ["SHA"],
             "signerSha256":os.environ["SIGNER"]

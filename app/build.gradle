@@ -31,13 +31,25 @@ android {
                 keyPassword System.getenv('APK_KEY_PASSWORD')
             }
         }
+        preview {
+            def path = System.getenv('PREVIEW_KEYSTORE_PATH')
+            if (path) {
+                storeFile file(path)
+                storePassword 'android'
+                keyAlias 'androiddebugkey'
+                keyPassword 'android'
+            }
+        }
     }
     buildTypes {
         release {
             minifyEnabled false
             if (System.getenv('APK_KEYSTORE_PATH')) signingConfig signingConfigs.stable
         }
-        debug { applicationIdSuffix '.debug' }
+        debug {
+            applicationIdSuffix '.preview'
+            if (System.getenv('PREVIEW_KEYSTORE_PATH')) signingConfig signingConfigs.preview
+        }
     }
     lint { abortOnError true }
 }

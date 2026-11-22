@@ -20,3 +20,7 @@ Après succès du workflow Android sur main, `.github/workflows/automatic-releas
 ## Canal preview (solution immédiate indépendante)
 
 Quand la clé stable d'origine est indisponible, `.github/workflows/android.yml` publie une véritable APK debug séparée (applicationId `fr.chk.alienlive.debug`) et un manifeste `update-preview.json`. La même APK préversion recherche ce manifeste et installe les versions suivantes **si la clé DEBUG mise en cache GitHub n'a pas expiré**. Cette clé est réservée aux tests ; la version principale ne change pas de signature et conserve ses données. Le vrai canal stable reste `update.json` et exige toujours le JKS historique. Aucun contournement de signature n'est utilisé.
+
+### Canal preview v2
+
+Le canal `fr.chk.alienlive.preview` utilise `update-preview-v2.json` et la clé `.preview-signing/debug.jks` générée une seule fois puis conservée dans le cache GitHub Actions (clé de cache `chk-pluthor-preview-signature-v2`). Les compilations refusent de recréer une clé si le cache a expiré et que le manifeste existe. Aucun changement de certificat silencieux. La préversion v2 se distingue de l'ancien paquet expérimental `fr.chk.alienlive.debug` ; installer la préversion v2 ne désinstalle pas l'application stable.
