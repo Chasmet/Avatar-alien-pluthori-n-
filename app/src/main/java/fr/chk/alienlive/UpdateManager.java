@@ -4,6 +4,9 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
+import android.content.pm.PackageInfo;
+import android.content.pm.PackageManager;
+import android.content.pm.Signature;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Environment;
@@ -55,7 +58,7 @@ public final class UpdateManager {
                         new AlertDialog.Builder(activity).setTitle(BuildConfig.DEBUG?"Nouvelle préversion disponible":"Nouvelle version disponible")
                             .setMessage("Version "+data.optString("versionName","nouvelle")+". Télécharger et installer sans effacer les données ?")
                             .setNegativeButton("Plus tard",null)
-                            .setPositiveButton("Télécharger",(d,w)->download(activity,url,sha256)).show();
+                            .setPositiveButton("Télécharger",(d,w)->download(activity,url,sha256,remote)).show();
                     }else if(explicit)Toast.makeText(activity,"Application à jour",Toast.LENGTH_LONG).show();
                 });
             }catch(Exception e){if(explicit)activity.runOnUiThread(()->Toast.makeText(activity,"Mise à jour indisponible : "+e.getMessage(),Toast.LENGTH_LONG).show());}
@@ -93,13 +96,15 @@ public final class UpdateManager {
                 if(build<=latest)continue;
                 JSONArray assets=release.optJSONArray("assets");
                 if(assets==null)continue;
+                // Honor nécessite API 23. Sur Android 21/22, prendre l'APK compat.
+                String apkName=Build.VERSION.SDK_INT>=23?"app-honor-debug.apk":"app-compat-debug.apk";
                 for(int n=0;n<assets.length();n++){
                     JSONObject asset=assets.optJSONObject(n);
-                    if(asset==null||!"app-honor-debug.apk".equals(asset.optString("name")))continue;
+                    if(asset==null||!apkName.equals(asset.optString("name")))continue;
                     String link=asset.optString("browser_download_url","");
                     String digest=asset.optString("digest","");
                     if(!digest.matches("sha256:[a-fA-F0-9]{64}"))continue;
-                    String expected="https://github.com/Chasmet/Avatar-alien-pluthori-n-/releases/download/"+tag+"/app-honor-debug.apk";
+                    String expected="https://github.com/Chasmet/Avatar-alien-pluthori-n-/releases/download/"+tag+"/"+apkName;
                     if(!expected.equals(link))continue;
                     JSONObject meta=new JSONObject();
                     meta.put("packageName","fr.chk.alienlive.preview");
@@ -115,7 +120,7 @@ public final class UpdateManager {
             return best;
         }finally{conn.disconnect();}
     }
-    private static void download(Activity activity,String url,String expectedSha){
+    private static void download(Activity activity,String url,String expectedSha,int expectedVersion){
         Toast.makeText(activity,"Téléchargement de la mise à jour…",Toast.LENGTH_LONG).show();
         new Thread(()->{
             try {
@@ -138,11 +143,48 @@ public final class UpdateManager {
                 StringBuilder checksum=new StringBuilder(64);
                 for(byte b:digest.digest())checksum.append(String.format(Locale.ROOT,"%02x",b&255));
                 if(!checksum.toString().equals(expectedSha)){
-                    apk.delete();throw new Exception("Signature de fichier non conforme (SHA-256)");
+                    apk.delete();throw new Exception("Intégrité APK incorrecte (SHA-256)");
                 }
+                // Ne jamais proposer à Android une mise à jour qui changerait
+                // de package, reculerait de version ou casserait la signature.
+                try { verifyInstallable(activity,apk,expectedVersion); }
+                catch(Exception problem){apk.delete();throw problem;}
                 activity.runOnUiThread(()->install(activity,apk));
             }catch(Exception e){activity.runOnUiThread(()->Toast.makeText(activity,"Erreur : "+e.getMessage(),Toast.LENGTH_LONG).show());}
         },"chk-update-download").start();
+    }
+    /** Vérifie localement le package, la version et la correspondance des certificats. */
+    private static void verifyInstallable(Activity activity,File apk,int expectedVersion) throws Exception {
+        PackageManager pm=activity.getPackageManager();
+        int flags=Build.VERSION.SDK_INT>=28
+            ?PackageManager.GET_SIGNING_CERTIFICATES:PackageManager.GET_SIGNATURES;
+        PackageInfo incoming=pm.getPackageArchiveInfo(apk.getAbsolutePath(),flags);
+        if(incoming==null)throw new Exception("Android ne reconnaît pas cet APK");
+        if(!activity.getPackageName().equals(incoming.packageName))
+            throw new Exception("Package incompatible : données protégées");
+        long code=Build.VERSION.SDK_INT>=28?incoming.getLongVersionCode():incoming.versionCode;
+        if(code!=expectedVersion||code<=BuildConfig.VERSION_CODE)
+            throw new Exception("Version APK incorrecte ou trop ancienne");
+        PackageInfo installed=pm.getPackageInfo(activity.getPackageName(),flags);
+        Signature[] oldSignatures=signatures(installed);
+        Signature[] newSignatures=signatures(incoming);
+        if(oldSignatures==null||newSignatures==null
+            ||oldSignatures.length==0||oldSignatures.length!=newSignatures.length)
+            throw new Exception("Certificat Android absent ou incompatible");
+        for(Signature original:oldSignatures){
+            boolean matched=false;
+            for(Signature candidate:newSignatures){
+                if(original.equals(candidate)){matched=true;break;}
+            }
+            if(!matched)throw new Exception("Signature différente : mise à jour refusée");
+        }
+    }
+    private static Signature[] signatures(PackageInfo packageInfo){
+        if(Build.VERSION.SDK_INT>=28){
+            if(packageInfo.signingInfo==null)return null;
+            return packageInfo.signingInfo.getApkContentsSigners();
+        }
+        return packageInfo.signatures;
     }
     private static void install(Activity activity,File apk){
         if(Build.VERSION.SDK_INT>=26&&!activity.getPackageManager().canRequestPackageInstalls()){
