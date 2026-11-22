@@ -12,6 +12,7 @@ public final class FaceCalibration {
     public int mode=HYBRID;
     public int mouthSensitivity=75,mouthMax=65,eyeSensitivity=80,gazeRange=55,smoothing=70,headRange=65;
     public boolean independentEyes=true,reverseVertical=false;
+    public float neutralMouth=0f,openMouthReference=1f;
     // Les positions sont normalisées X gauche->droite et Y bas->haut.
     public float leftX=.375f,leftY=.705f,rightX=.625f,rightY=.705f,mouthX=.50f,mouthY=.54f;
     private final String key;
@@ -46,6 +47,8 @@ public final class FaceCalibration {
             f.rightX=clamp((float)j.optDouble("rightX",.625));
             f.rightY=clamp((float)j.optDouble("rightY",.705));
             f.mouthX=clamp((float)j.optDouble("mouthX",.50));
+            f.neutralMouth=clamp((float)j.optDouble("neutralMouth",0));
+            f.openMouthReference=clamp((float)j.optDouble("openMouthReference",1));
             f.mouthY=clamp((float)j.optDouble("mouthY",.54));
         }catch(Exception ignored){}
         return f;
@@ -59,7 +62,8 @@ public final class FaceCalibration {
                 .put("independentEyes",independentEyes).put("reverseVertical",reverseVertical)
                 .put("leftX",leftX).put("leftY",leftY)
                 .put("rightX",rightX).put("rightY",rightY)
-                .put("mouthX",mouthX).put("mouthY",mouthY);
+                .put("mouthX",mouthX).put("mouthY",mouthY)
+                .put("neutralMouth",neutralMouth).put("openMouthReference",openMouthReference);
             AlienData.prefs(context).edit().putString(key,j.toString()).apply();
         }catch(Exception e){throw new IllegalStateException("Impossible de sauvegarder la calibration",e);}
     }
@@ -68,7 +72,9 @@ public final class FaceCalibration {
         return load(c);
     }
     public float mouth(float detected){
-        return clamp(detected*(.35f+mouthSensitivity/80f)*mouthMax/100f);
+        float openRange=Math.max(.10f,openMouthReference-neutralMouth);
+        return clamp(Math.max(0f,detected-neutralMouth)/openRange
+            *(.35f+mouthSensitivity/80f)*mouthMax/100f);
     }
     public float blink(float closure){
         return clamp(closure*eyeSensitivity/80f);
