@@ -1,0 +1,59 @@
+name: CHK Alien Live - Build Android APK
+on:
+  push:
+    branches: [main]
+    paths:
+      - "app/**"
+      - "gradle/**"
+      - "build.gradle"
+      - "settings.gradle"
+      - "gradle.properties"
+      - "gradlew"
+      - "tools/**"
+      - ".github/workflows/android.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+      - name: Android SDK 34
+        run: sdkmanager "platforms;android-34" "build-tools;34.0.0"
+      - name: Verifier les fichiers sources
+        run: |
+          python3 tools/verify_source.py
+          javac tools/ParseJavaSources.java
+          java -cp tools ParseJavaSources
+      - name: Build Honor 200 (ML Kit local)
+        run: bash ./gradlew --no-daemon --stacktrace assembleHonorDebug assembleHonorRelease
+      - name: Build compatibilite Android 21
+        run: bash ./gradlew --no-daemon --stacktrace assembleCompatDebug
+      - name: Verifier le package
+        run: |
+          test -s app/build/outputs/apk/honor/release/app-honor-release-unsigned.apk
+          "$ANDROID_HOME/build-tools/34.0.0/aapt" dump badging app/build/outputs/apk/honor/release/app-honor-release-unsigned.apk | grep "package: name='fr.chk.alienlive'"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CHK-Alien-Live-Honor-Release-Unsigned
+          path: app/build/outputs/apk/honor/release/*.apk
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CHK-Alien-Live-Android-Debug
+          path: |
+            app/build/outputs/apk/honor/debug/*.apk
+            app/build/outputs/apk/compat/debug/*.apk
+          if-no-files-found: error
