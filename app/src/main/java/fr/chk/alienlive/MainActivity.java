@@ -148,7 +148,7 @@ public final class MainActivity extends Activity {
         if(hasFocus)applySystemUi();
     }
     @Override protected void onResume(){
-        super.onResume();stage.reload();
+        super.onResume();UpdateManager.resumeInstall(this);stage.reload();
         animateLips=AlienData.prefs(this).getBoolean("animateMouth",true);
         model3D.onResume();
         sync3DMode();
@@ -159,7 +159,7 @@ public final class MainActivity extends Activity {
         }else{tracker.start();}
         long now=System.currentTimeMillis();
         long previousCheck=AlienData.prefs(this).getLong("lastUpdateCheck",0L);
-        if(AlienData.prefs(this).getBoolean("autoUpdate",true)&&now-previousCheck>86400000L){
+        if(AlienData.prefs(this).getBoolean("autoUpdate",true)&&now-previousCheck>900000L){
             AlienData.prefs(this).edit().putLong("lastUpdateCheck",now).apply();
             UpdateManager.check(this,false);
         }

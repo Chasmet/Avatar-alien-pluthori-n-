@@ -24,7 +24,16 @@ import java.util.Locale;
 public final class UpdateManager {
     private static final String META_STABLE="https://raw.githubusercontent.com/Chasmet/Avatar-alien-pluthori-n-/main/update.json";
     private static final String META_PREVIEW="https://raw.githubusercontent.com/Chasmet/Avatar-alien-pluthori-n-/main/update-preview-v2.json";
+    private static volatile File pendingApk;
     private UpdateManager() { }
+    public static void resumeInstall(Activity activity){
+        File file=pendingApk;
+        if(file!=null&&file.isFile()&&
+            (Build.VERSION.SDK_INT<26||activity.getPackageManager().canRequestPackageInstalls())){
+            pendingApk=null;
+            install(activity,file);
+        }
+    }
     public static void check(Activity activity,boolean explicit){
         new Thread(()->{
             try {
@@ -86,8 +95,9 @@ public final class UpdateManager {
     }
     private static void install(Activity activity,File apk){
         if(Build.VERSION.SDK_INT>=26&&!activity.getPackageManager().canRequestPackageInstalls()){
+            pendingApk=apk;
             new AlertDialog.Builder(activity).setTitle("Autoriser l'installation")
-                .setMessage("Autorise CHK Alien Live à installer ses mises à jour, puis relance la vérification.")
+                .setMessage("Autorise l'installation des mises à jour. L'APK déjà téléchargé sera réutilisé à ton retour.")
                 .setPositiveButton("Réglages",(d,w)->{
                     Intent it=new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,Uri.parse("package:"+activity.getPackageName()));
                     activity.startActivity(it);

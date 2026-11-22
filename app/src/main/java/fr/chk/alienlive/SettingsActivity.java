@@ -57,6 +57,10 @@ public final class SettingsActivity extends Activity {
         findViewById(R.id.checkUpdate).setOnClickListener(v->UpdateManager.check(this,true));
         ((TextView)findViewById(R.id.version)).setText("Version "+BuildConfig.VERSION_NAME+" ("+BuildConfig.VERSION_CODE+")");
     }
+    @Override protected void onResume(){
+        super.onResume();
+        UpdateManager.resumeInstall(this);
+    }
     private void setup(int id,String key,boolean fallback){
         Switch toggle=findViewById(id);
         toggle.setChecked(AlienData.prefs(this).getBoolean(key,fallback));

@@ -57,6 +57,7 @@ jobs:
       - name: Verifier les fichiers sources
         run: |
           python3 tools/verify_source.py
+          python3 tools/verify_glb.py
           javac tools/ParseJavaSources.java
           java -cp tools ParseJavaSources
       - name: Build Honor 200 (ML Kit local)
@@ -100,6 +101,7 @@ jobs:
           test -n "$SIGNER"
           # Si la clé debug change, refuser une mise à jour qui ne serait pas installable.
           CURRENT=$(gh api "repos/$GITHUB_REPOSITORY/contents/update-preview-v2.json" --jq .sha 2>/dev/null || true)
+          if [[ ! "$CURRENT" =~ ^[0-9a-f]{40}$ ]]; then CURRENT=""; fi
           if [ -n "$CURRENT" ]; then
             PREVIOUS_SIGNER=$(gh api "repos/$GITHUB_REPOSITORY/contents/update-preview-v2.json" --jq .content | base64 -d | python3 -c 'import json,sys;print(json.load(sys.stdin).get("signerSha256",""))')
             if [ -n "$PREVIOUS_SIGNER" ] && [ "$PREVIOUS_SIGNER" != "$SIGNER" ]; then
