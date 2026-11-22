@@ -8,8 +8,8 @@ android {
         applicationId 'fr.chk.alienlive'
         minSdk 21
         targetSdk 34
-        versionCode = 10000 + Integer.parseInt(System.getenv('GITHUB_RUN_NUMBER') ?: '1')
-        versionName = (System.getenv('RELEASE_VERSION') ?: '0.5.0').replace('v','')
+        versionCode = 20000 + Integer.parseInt(System.getenv('GITHUB_RUN_NUMBER') ?: '1')
+        versionName = (System.getenv('RELEASE_VERSION') ?: ('0.6.' + (System.getenv('GITHUB_RUN_NUMBER') ?: '1'))).replace('v','')
     }
     flavorDimensions 'tracking'
     productFlavors {
