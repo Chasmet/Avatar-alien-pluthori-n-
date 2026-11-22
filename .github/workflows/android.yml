@@ -108,12 +108,17 @@ jobs:
               exit 1
             fi
           fi
+          # Métadonnées vérifiables même si l'API GitHub omet l'attribut digest.
+          SHA_HONOR=$(sha256sum "$APK" | cut -d' ' -f1)
+          SHA_COMPAT=$(sha256sum "$COMPAT" | cut -d' ' -f1)
+          NOTES=$(printf 'CHK Pluthor %s : lèvres synchronisées caméra/microphone, voix 44,1 kHz, cinq GLB accessibles, rendu original préservé.\nSignataire SHA-256 : %s\nsha256-honor=%s\nsha256-compat=%s\n' "$VERSION" "$SIGNER" "$SHA_HONOR" "$SHA_COMPAT")
           # Signature figée par le cache. Une expiration bloque la compilation.
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release upload "$TAG" "$APK#CHK-Pluthor-Honor-Preview.apk" "$COMPAT#CHK-Pluthor-Android-Preview.apk" --clobber --repo "$GITHUB_REPOSITORY"
+            gh release upload "$TAG" "$APK" "$COMPAT" --clobber --repo "$GITHUB_REPOSITORY"
           else
             gh release create "$TAG" "$APK#CHK-Pluthor-Honor-Preview.apk" "$COMPAT#CHK-Pluthor-Android-Preview.apk" \
               --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease \
               --title "CHK Pluthor — Préversion $VERSION" \
-              --notes "5 aliens GLB articulés. Préversion Android signée, package fr.chk.alienlive.preview ; s'installe en parallèle sans supprimer les données de l'application stable. Mises à jour détectées directement dans la liste HTTPS des Releases ; certificat SHA-256: $SIGNER."
+              --notes "$NOTES"
           fi
+          gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --notes "$NOTES"
