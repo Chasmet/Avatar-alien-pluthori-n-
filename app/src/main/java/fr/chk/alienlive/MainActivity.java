@@ -101,7 +101,7 @@ public final class MainActivity extends Activity {
             @Override public void onExpression(float yaw,float pitch,float leftBlink,float rightBlink){
                 runOnUiThread(()->{
                     stage.updateExpression(yaw,pitch,leftBlink,rightBlink);
-                    model3D.setExpression(yaw,pitch);
+                    model3D.setExpression(yaw,pitch,Math.max(leftBlink,rightBlink));
                 });
             }
             @Override public void onStatus(String message){runOnUiThread(()->status.setText(message));}
