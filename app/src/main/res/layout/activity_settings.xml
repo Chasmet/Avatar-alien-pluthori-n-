@@ -38,18 +38,22 @@
             android:textStyle="bold" android:textColor="#E6B5FF" android:textSize="20sp" />
         <Switch android:id="@+id/useModel3D" android:layout_width="match_parent"
             android:layout_height="56dp" android:checked="true"
-            android:text="Modèles 3D GLB — les cinq extraterrestres"
+            android:text="Alpha 3D — apparence de ma version d'origine"
             android:textColor="#FFFFFF"/>
         <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:text="Cinq modèles GLB sont inclus dans l'application : Alpha, Sage, Gardien, Ombre et Annunaki. Le personnage personnalisé reste en portrait 2D."
+            android:text="Le visage Alpha original et les portraits des autres personnages sont conservés par défaut. Les cinq GLB existent pour les essais, sans remplacer ton rendu habituel."
             android:textColor="#C0B5D2" android:textSize="12sp"/>
-        <Switch android:id="@+id/originalAlphaModel" android:layout_width="match_parent"
+        <Switch android:id="@+id/experimental3D" android:layout_width="match_parent"
             android:layout_height="56dp" android:checked="false"
-            android:text="Alpha : utiliser le modèle 3D d'origine"
+            android:text="Tester les GLB reconstruits des autres aliens"
+            android:textColor="#FFFFFF"/>
+        <Switch android:id="@+id/experimentalAlpha" android:layout_width="match_parent"
+            android:layout_height="56dp" android:checked="false"
+            android:text="Tester le GLB Alpha reconstruit (non recommandé)"
             android:textColor="#FFFFFF"/>
         <Switch android:id="@+id/naturalModel" android:layout_width="match_parent"
             android:layout_height="58dp" android:checked="true"
-            android:text="Rendu naturel : masquer les volumes gris"
+            android:text="Masquer les volumes gris (GLB expérimentaux)"
             android:textColor="#FFFFFF"/>
         <Switch android:id="@+id/followHead" android:layout_width="match_parent" android:layout_height="56dp"
             android:text="Suivre les mouvements de tête" android:textColor="#FFFFFF" android:checked="true"/>

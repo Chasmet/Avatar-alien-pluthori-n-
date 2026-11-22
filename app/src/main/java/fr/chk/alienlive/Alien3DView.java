@@ -33,7 +33,8 @@ public final class Alien3DView extends GLSurfaceView {
     private volatile float yaw=0f,pitch=0f,roll=0f,mouth=0f,x=.5f,y=.5f;
     private volatile boolean saver=false;
     private volatile boolean naturalModel=true;
-    private volatile String activeAsset=AlienData.MODEL_FILES[0];
+    // Charge d'abord le véritable modèle historique, non sa reconstruction basse résolution.
+    private volatile String activeAsset="pluthorien_alpha.glb";
     private volatile boolean reloadModel=false;
     private boolean framesActive=false;
     private final Runnable frameTicker=new Runnable(){
@@ -69,6 +70,9 @@ public final class Alien3DView extends GLSurfaceView {
             activeAsset=asset;
             reloadModel=true;
             requestRender();
+        }else if(renderer.loaded){
+            // Après un retour du mode portrait, restaurer la vue 3D déjà chargée.
+            post(()->renderer.callback.onReady());
         }
     }
     @Override public void onResume(){
@@ -88,7 +92,7 @@ public final class Alien3DView extends GLSurfaceView {
         private final List<Mesh> meshes=new ArrayList<>();
         private int program,positionLoc,uvLoc,mvpLoc,baseLoc,texLoc,useTexLoc,lightLoc,lipLoc;
         private int textureId;
-        private boolean loaded;
+        private volatile boolean loaded;
         private float easedYaw,easedPitch,easedRoll,easedJaw,easedX=.5f,easedY=.5f;
         private final String VERTEX="attribute vec3 aPos;attribute vec2 aUv;uniform mat4 uMvp;uniform float uLip;varying vec2 vUv;varying float vLight;void main(){vec3 pos=aPos;float region=exp(-32.0*pos.x*pos.x-165.0*(pos.y+0.30)*(pos.y+0.30));pos.y+=uLip*0.022*region;pos.z+=uLip*0.009*region;vUv=aUv;vLight=0.84+0.16*max(0.0,pos.z);gl_Position=uMvp*vec4(pos,1.0);}";
         private final String FRAGMENT="precision mediump float;varying vec2 vUv;varying float vLight;uniform sampler2D uTexture;uniform vec4 uBase;uniform float uUseTexture;void main(){vec4 c=uBase;if(uUseTexture>0.5)c*=texture2D(uTexture,vUv);gl_FragColor=vec4(c.rgb*vLight,c.a);}";
@@ -160,14 +164,20 @@ public final class Alien3DView extends GLSurfaceView {
             GLES20.glBindTexture(GLES20.GL_TEXTURE_2D,textureId);
             GLES20.glUniform1i(texLoc,0);
             for(Mesh mesh:meshes){
-                // Évite les volumes gris artificiels qui encadrent la texture du visage.
-                if(naturalModel&&!mesh.textured&&!mesh.jaw)continue;
+                boolean classic="pluthorien_alpha.glb".equals(activeAsset);
+                // Tous les volumes d'origine sont préservés dans le mode fidèle.
+                if(!classic&&naturalModel&&!mesh.textured&&!mesh.jaw)continue;
                 Matrix.setIdentityM(local,0);
                 if(mesh.jaw){
-                    // Rotation autour de la ligne des lèvres et non de l'origine.
-                    Matrix.translateM(local,0,0f,-.300f-easedJaw*.018f,0f);
-                    Matrix.rotateM(local,0,-easedJaw*21f,1f,0f,0f);
-                    Matrix.translateM(local,0,0f,.300f,0f);
+                    if(classic){
+                        // Pivot ET amplitude exacts du modèle Alpha de la v0.6.9.
+                        Matrix.translateM(local,0,0f,-.3166667f,0f);
+                        Matrix.rotateM(local,0,-easedJaw*23f,1f,0f,0f);
+                    }else{
+                        Matrix.translateM(local,0,0f,-.300f-easedJaw*.018f,0f);
+                        Matrix.rotateM(local,0,-easedJaw*21f,1f,0f,0f);
+                        Matrix.translateM(local,0,0f,.300f,0f);
+                    }
                 }
                 Matrix.multiplyMM(tmp,0,root,0,local,0);
                 float[] vm=new float[16];
@@ -177,7 +187,7 @@ public final class Alien3DView extends GLSurfaceView {
                 GLES20.glUniform4fv(baseLoc,1,mesh.color,0);
                 GLES20.glUniform1f(useTexLoc,mesh.textured?1f:0f);
                 // Déformation locale de la lèvre haute sur les sommets texturés.
-                GLES20.glUniform1f(lipLoc,mesh.textured&&!mesh.jaw?easedJaw:0f);
+                GLES20.glUniform1f(lipLoc,!classic&&mesh.textured&&!mesh.jaw?easedJaw:0f);
                 mesh.positions.position(0);
                 GLES20.glEnableVertexAttribArray(positionLoc);
                 GLES20.glVertexAttribPointer(positionLoc,3,GLES20.GL_FLOAT,false,0,mesh.positions);

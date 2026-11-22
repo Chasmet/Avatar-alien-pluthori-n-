@@ -139,14 +139,11 @@ public final class AlienStageView extends View {
         // No persistent render loop once the Activity is no longer visible.
     }
     private void drawCover(Canvas c,Bitmap b,float w,float h){
-        long time=SystemClock.uptimeMillis();
+        // Cadre et proportions identiques à la version stable.
         float scale=Math.max(w/b.getWidth(),h/b.getHeight());
-        // Lent travelling optique et parallaxe discrets, sans bords découverts.
-        float zoom=1.045f+.008f*(float)Math.sin(time*.00023f);
-        float sw=b.getWidth()*scale*zoom,sh=b.getHeight()*scale*zoom;
-        float sway=(float)Math.sin(time*.00017f)*w*.008f+(headX-.5f)*w*.017f;
-        float rise=(float)Math.cos(time*.00013f)*h*.006f+(headY-.5f)*h*.012f;
+        float sw=b.getWidth()*scale,sh=b.getHeight()*scale;
+        float sway=(float)Math.sin(SystemClock.uptimeMillis()*.00013f)*w*.012f+(headX-.5f)*w*.018f;
         paint.setAlpha(255);
-        c.drawBitmap(b,null,new RectF((w-sw)/2f+sway,(h-sh)/2f+rise,(w+sw)/2f+sway,(h+sh)/2f+rise),paint);
+        c.drawBitmap(b,null,new RectF((w-sw)/2f+sway,(h-sh)/2f,(w+sw)/2f+sway,(h+sh)/2f),paint);
     }
 }

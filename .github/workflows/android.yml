@@ -58,6 +58,7 @@ jobs:
         run: |
           python3 tools/verify_source.py
           python3 tools/verify_glb.py
+          python3 tools/verify_visual_fidelity.py
           javac tools/ParseJavaSources.java
           java -cp tools ParseJavaSources
       - name: Build Honor 200 (ML Kit local)

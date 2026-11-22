@@ -18,6 +18,7 @@ public final class MainActivity extends Activity {
     private boolean model3DReady=false;
     private int activeModel=-1;
     private boolean usingOriginalAlpha=false;
+    private boolean previous3DWanted=false;
     private FaceTracker tracker;
     private VoiceEngine voice;
     private Button voiceButton;
@@ -92,21 +93,28 @@ public final class MainActivity extends Activity {
     private void sync3DMode(){
         if(model3D==null||stage==null)return;
         int selected=AlienData.character(this);
-        boolean originalAlpha=AlienData.prefs(this).getBoolean("originalAlphaModel",false);
-        if(selected!=activeModel || (selected==0 && usingOriginalAlpha!=originalAlpha)){
+        // PRIORITÉ VISUELLE : le rendu de la version stable 0.6.9 reste la référence.
+        // Les GLB reconstruits sont disponibles uniquement après activation volontaire.
+        boolean experimentalOthers=AlienData.prefs(this).getBoolean("experimental3D",false);
+        boolean experimentalAlpha=AlienData.prefs(this).getBoolean("experimentalAlpha",false);
+        boolean originalAlpha=!experimentalAlpha;
+        boolean wanted=AlienData.prefs(this).getBoolean("useModel3D",true)
+                &&(selected==0 || (selected<AlienData.MODEL_FILES.length&&experimentalOthers));
+        if(selected!=activeModel || (selected==0&&usingOriginalAlpha!=originalAlpha)
+                || (wanted&&!previous3DWanted)){
             model3DReady=false;
             activeModel=selected;
             usingOriginalAlpha=originalAlpha;
-            if(selected<AlienData.MODEL_FILES.length)
-                model3D.setCharacter(selected,originalAlpha);
+            if(wanted)model3D.setCharacter(selected,originalAlpha);
         }
-        boolean wanted=selected<AlienData.MODEL_FILES.length
-            &&AlienData.prefs(this).getBoolean("useModel3D",true);
+        previous3DWanted=wanted;
         model3D.setVisibility(wanted?View.VISIBLE:View.GONE);
         stage.set3DMode(wanted&&model3DReady);
         model3D.setHeadTracking(AlienData.prefs(this).getBoolean("followHead",true));
         model3D.setBatterySaver(AlienData.prefs(this).getBoolean("saveBattery",false));
-        model3D.setNaturalModel(AlienData.prefs(this).getBoolean("naturalModel",true));
+        // Ne jamais supprimer la géométrie du GLB original : même silhouette que 0.6.9.
+        model3D.setNaturalModel(selected!=0
+                &&AlienData.prefs(this).getBoolean("naturalModel",true));
     }
     private void startVoice(){
         if(Build.VERSION.SDK_INT>=23&&checkSelfPermission(Manifest.permission.RECORD_AUDIO)!=PackageManager.PERMISSION_GRANTED){

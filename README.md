@@ -54,3 +54,15 @@ Les APK de prévisualisation portent les noms de Release `app-honor-debug.apk` e
 ### Lecture des versions sans manifeste GitHub à écrire
 
 Le canal de prévisualisation v2 lit désormais directement les Releases GitHub publiques (uniquement les tags `chk-pluthor-preview-v2-*`) et vérifie le SHA-256 fourni avec l'APK. Il n'exige plus qu'un workflow modifie un fichier manifeste via l'API GitHub. Le fichier `update-preview-v2.json` conservé dans le dépôt est un **marqueur public de certificat** : si le cache de la clé privée est perdu, les nouvelles compilations sont bloquées, ce qui empêche la publication d'une mise à jour impossible à installer sur la version existante.
+
+## Fidélité du rendu (correctif 22 novembre 2026)
+
+**La version stable v0.6.9 est la référence visuelle.** Sans action de l'utilisateur :
+- Le personnage Alpha utilise `pluthorien_alpha.glb` (fichier original identique, SHA Git `bf81d4ec17731d4535ab0bfa7d91feda9976caee`) et son pivot de mâchoire d'origine.
+- Les personnages Sage, Gardien, Ombre et Annunaki utilisent leurs portraits photoréalistes historiques, non les GLB approximatifs.
+- Le cadrage du décor suit les mêmes proportions que la stable.
+- Les cinq fichiers `*_rig.glb` restent disponibles, mais leur utilisation exige d'activer explicitement « Tester les GLB reconstruits des autres aliens » ou « Tester le GLB Alpha reconstruit » dans Réglages.
+- L'ancienne préférence `originalAlphaModel=false` (héritée d'une préversion) ne force plus le visage reconstruit.
+- `tools/verify_visual_fidelity.py` bloque une compilation si le GLB original est altéré ou si ces réglages deviennent actifs par défaut.
+
+Cette correction est un retour à la référence d'apparence, pas une validation photographique de chaque écran : tester sur Honor 200 avant de diffuser.
