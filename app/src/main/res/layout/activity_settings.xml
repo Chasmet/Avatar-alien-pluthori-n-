@@ -41,7 +41,7 @@
             android:text="Alpha 3D — apparence de ma version d'origine"
             android:textColor="#FFFFFF"/>
         <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:text="Le visage Alpha original et les portraits des autres personnages sont conservés par défaut. Les cinq GLB existent pour les essais, sans remplacer ton rendu habituel."
+            android:text="Le modèle Alpha original est conservé. Dans Personnages, sélectionne un autre extraterrestre puis active son GLB 3D individuellement. Les portraits photoréalistes restent le choix par défaut."
             android:textColor="#C0B5D2" android:textSize="12sp"/>
         <Switch android:id="@+id/experimental3D" android:layout_width="match_parent"
             android:layout_height="56dp" android:checked="false"
