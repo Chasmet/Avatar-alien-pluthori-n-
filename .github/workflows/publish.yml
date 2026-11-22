@@ -7,6 +7,7 @@ on:
   workflow_dispatch:
 permissions:
   contents: write
+  actions: read
 jobs:
   release:
     runs-on: ubuntu-latest
@@ -22,6 +23,17 @@ jobs:
           packages: 'platform-tools'
       - name: SDK Android 34
         run: sdkmanager "build-tools;34.0.0"
+      - name: Reconstituer l'APK stable avec signature publique
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          PATCH="$(python3 -c 'import json; d=json.load(open("update.json"));print("distribution/v"+d["versionName"]+"-signature-delta.json")')"
+          RUN="$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["source_run_id"])' "$PATCH")"
+          NAME="$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["artifact_name"])' "$PATCH")"
+          mkdir -p "$RUNNER_TEMP/chk-unsigned"
+          gh run download "$RUN" --repo "$GITHUB_REPOSITORY" --name "$NAME" --dir "$RUNNER_TEMP/chk-unsigned"
+          python3 tools/reconstruct_signed_apk.py "$RUNNER_TEMP/chk-unsigned" "$PATCH"
       - name: Verify APK signature, version and SHA-256
         run: python3 tools/verify_release.py
       - name: Publish GitHub Release
