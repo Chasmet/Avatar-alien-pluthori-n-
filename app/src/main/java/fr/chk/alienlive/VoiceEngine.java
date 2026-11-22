@@ -11,7 +11,7 @@ import android.os.Process;
 
 /** Local offline voice effect: granular two-tap pitch shifter and subtle robotic texture.
  *  Plays through the Android media output. It does NOT replace another app's microphone.
- *  This output is capturable ONLY if the screen-sharing app supports internal media audio.
+ *  Audio output remains within this app; Android does not replace other apps' microphone.
  */
 public final class VoiceEngine {
     public interface Listener { void onState(String message); }
