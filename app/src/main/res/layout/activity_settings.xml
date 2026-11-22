@@ -25,7 +25,7 @@
             android:text="La météo évolutive change automatiquement toutes les 65 secondes, avec transitions progressives. Brume, poussière, nuages, pluie et orages sont générés sans connexion."
             android:textColor="#BCAFD1" android:textSize="13sp" android:paddingBottom="16dp" />
         <Switch android:id="@+id/batterySaver" android:layout_width="match_parent" android:layout_height="64dp"
-            android:text="Économie de batterie (20 images/s)" android:textColor="#FFFFFF" android:checked="true" />
+            android:text="Économie de batterie (20 images/s)" android:textColor="#FFFFFF" android:checked="false" />
         <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
             android:layout_marginTop="15dp" android:text="Mises à jour (majauto)"
             android:textStyle="bold" android:textColor="#E6B5FF" android:textSize="20sp" />
@@ -33,12 +33,27 @@
             android:text="Recherche automatique des nouvelles versions" android:textColor="#FFFFFF" android:checked="true" />
         <Button android:id="@+id/checkUpdate" android:layout_width="match_parent" android:layout_height="56dp"
             android:text="Vérifier les mises à jour" android:textAllCaps="false" />
-        <Switch android:id="@+id/animateMouth" android:layout_width="match_parent" android:layout_height="64dp"
-            android:text="Animation bouche par caméra (expérimental)"
-            android:textColor="#FFFFFF" android:checked="true" />
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="16dp" android:text="Suivi facial temps réel"
+            android:textStyle="bold" android:textColor="#E6B5FF" android:textSize="20sp" />
+        <Switch android:id="@+id/followHead" android:layout_width="match_parent" android:layout_height="56dp"
+            android:text="Suivre les mouvements de tête" android:textColor="#FFFFFF" android:checked="true"/>
+        <Switch android:id="@+id/animateEyes" android:layout_width="match_parent" android:layout_height="56dp"
+            android:text="Clignements et expressions des yeux" android:textColor="#FFFFFF" android:checked="true"/>
+        <Switch android:id="@+id/animateMouth" android:layout_width="match_parent" android:layout_height="56dp"
+            android:text="Synchronisation lèvres et bouche par caméra"
+            android:textColor="#FFFFFF" android:checked="true"/>
+        <TextView android:id="@+id/mouthSensitivityLabel" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:text="Sensibilité de la bouche : 75 %"
+            android:textColor="#E8D8FF" android:layout_marginTop="12dp"/>
+        <SeekBar android:id="@+id/mouthSensitivity" android:layout_width="match_parent"
+            android:layout_height="48dp" android:max="100" android:progress="75"/>
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:text="Avant le LIVE, parle devant la caméra. L'écran d'accueil affiche le niveau d'ouverture détecté. Pour une bouche plus expressive, augmente la sensibilité."
+            android:textColor="#BCAFD1" android:textSize="13sp"/>
         <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
             android:paddingTop="14dp"
-            android:text="La transformation de la voix est proposée dans le nouvel écran Voix. Elle diffuse l’effet sur la sortie audio du téléphone et ne remplace PAS automatiquement le microphone TikTok. Cette version anime les décors, suit la tête et estime les mouvements de bouche par caméra. Ce suivi est approximatif, sans transcription ni accès au micro. Les personnages restent des portraits 2D avec une animation proxy : un visage 3D photoréaliste exige un modèle riggé."
+            android:text="La transformation de la voix est proposée dans le nouvel écran Voix. Elle diffuse l’effet sur la sortie audio du téléphone et ne remplace PAS automatiquement le microphone TikTok. Le visage est suivi par la caméra et le maillage du portrait reproduit la mâchoire, la bouche et les paupières. Le suivi des phonèmes précis reste impossible avec une simple photo 2D ; un personnage 3D riggé sera nécessaire."
             android:textColor="#C8BDD8" android:textSize="14sp" />
         <TextView android:id="@+id/version" android:layout_width="match_parent" android:layout_height="70dp"
             android:gravity="center_vertical" android:textColor="#B89ACF" android:textSize="14sp" />

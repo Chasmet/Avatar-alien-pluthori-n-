@@ -12,9 +12,23 @@ public final class SettingsActivity extends Activity {
     @Override protected void onCreate(Bundle state){
         super.onCreate(state);setContentView(R.layout.activity_settings);
         setup(R.id.autoUpdate,"autoUpdate",true);
-        setup(R.id.batterySaver,"saveBattery",true);
+        setup(R.id.batterySaver,"saveBattery",false);
+        setup(R.id.followHead,"followHead",true);
+        setup(R.id.animateEyes,"animateEyes",true);
         setup(R.id.animatedWeather,"animatedWeather",true);
         setup(R.id.animateMouth,"animateMouth",true);
+        final SeekBar sensitivity=findViewById(R.id.mouthSensitivity);
+        sensitivity.setProgress(AlienData.prefs(this).getInt("mouthSensitivity",75));
+        final TextView sensitivityText=findViewById(R.id.mouthSensitivityLabel);
+        sensitivityText.setText("Sensibilité de la bouche : "+sensitivity.getProgress()+" %");
+        sensitivity.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){
+            @Override public void onProgressChanged(SeekBar s,int value,boolean fromUser){
+                sensitivityText.setText("Sensibilité de la bouche : "+value+" %");
+                if(fromUser)AlienData.prefs(SettingsActivity.this).edit().putInt("mouthSensitivity",value).apply();
+            }
+            @Override public void onStartTrackingTouch(SeekBar s){}
+            @Override public void onStopTrackingTouch(SeekBar s){}
+        });
         final Spinner mode=findViewById(R.id.weatherMode);
         ArrayAdapter<String> adapter=new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,AtmosphereRenderer.WEATHER_NAMES);
         mode.setAdapter(adapter);

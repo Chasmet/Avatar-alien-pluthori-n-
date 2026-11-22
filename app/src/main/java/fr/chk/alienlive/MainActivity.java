@@ -21,6 +21,7 @@ public final class MainActivity extends Activity {
     private View controls,header,hint;
     private boolean full=false;
     private TextView status;
+    private long lastFaceDiagnostic=0L;
     @Override public void onCreate(Bundle saved){
         super.onCreate(saved);
         setContentView(R.layout.activity_main);
@@ -48,7 +49,19 @@ public final class MainActivity extends Activity {
             return false;
         });
         tracker=new FaceTracker(this,new FaceTracker.Listener(){
-            @Override public void onPose(float x,float y,float roll,float mouth){runOnUiThread(()->stage.updatePose(x,y,roll,mouth));}
+            @Override public void onPose(float x,float y,float roll,float mouth){
+                runOnUiThread(()->{
+                    stage.updatePose(x,y,roll,mouth);
+                    long now=android.os.SystemClock.uptimeMillis();
+                    if(now-lastFaceDiagnostic>250L){
+                        lastFaceDiagnostic=now;
+                        status.setText("Visage suivi | Bouche : "+(int)(stage.getMouthLevel()*100)+" % | Déplace la tête et parle");
+                    }
+                });
+            }
+            @Override public void onExpression(float yaw,float pitch,float leftBlink,float rightBlink){
+                runOnUiThread(()->stage.updateExpression(yaw,pitch,leftBlink,rightBlink));
+            }
             @Override public void onStatus(String message){runOnUiThread(()->status.setText(message));}
         });
     }
