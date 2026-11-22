@@ -38,6 +38,12 @@
             android:minWidth="0dp" android:text="GRAND ÉCRAN"
             android:textAllCaps="false" android:textColor="#FFFFFF"
             android:backgroundTint="#7142AA"/>
+        <Button android:id="@+id/calFreezeMotion"
+            android:layout_width="wrap_content" android:layout_height="43dp"
+            android:minWidth="0dp" android:text="TÊTE GELÉE"
+            android:textSize="11sp" android:textAllCaps="false"
+            android:backgroundTint="#363153"
+            android:visibility="gone"/>
         <TextView android:id="@+id/calZoomStatus"
             android:layout_width="wrap_content" android:layout_height="wrap_content"
             android:padding="7dp" android:text="Zoom 100 %"
