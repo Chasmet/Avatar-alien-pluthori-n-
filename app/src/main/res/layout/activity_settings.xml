@@ -38,10 +38,10 @@
             android:textStyle="bold" android:textColor="#E6B5FF" android:textSize="20sp" />
         <Switch android:id="@+id/useModel3D" android:layout_width="match_parent"
             android:layout_height="56dp" android:checked="true"
-            android:text="Alpha 3D — apparence de ma version d'origine"
+            android:text="Personnages GLB 3D : originaux et importés"
             android:textColor="#FFFFFF"/>
         <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:text="Le modèle Alpha original est conservé. Dans Personnages, sélectionne un autre extraterrestre puis active son GLB 3D individuellement. Les portraits photoréalistes restent le choix par défaut."
+            android:text="Importe Annunaki 1 et tes futurs GLB dans Personnages. Ils restent sur le téléphone après les mises à jour signées. Le GLB Alpha historique et les portraits restent conservés."
             android:textColor="#C0B5D2" android:textSize="12sp"/>
         <Switch android:id="@+id/experimental3D" android:layout_width="match_parent"
             android:layout_height="56dp" android:checked="false"
