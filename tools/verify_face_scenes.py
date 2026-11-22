@@ -22,7 +22,9 @@ for token in ('onFacialMeasurements(', 'getSmilingProbability()',
               'FaceContour.UPPER_LIP_BOTTOM'):
     assert token in honor,'ML Kit missing '+token
 assert 'onFacialMeasurements(' in compat
-assert 'model3D.setExpression(yaw,pitch,leftBlink,rightBlink);' in main
+assert 'model3D.setExpression(' in main
+assert 'cal.blink(leftBlink)' in main and 'cal.blink(rightBlink)' in main
+assert 'cal.head(yaw)' in main and 'cal.head(pitch)' in main
 assert 'faceDiagnostics.setText(' in main
 for token in ('reverseVertical','faceDiagnosticsToggle'):
     assert token in settings
