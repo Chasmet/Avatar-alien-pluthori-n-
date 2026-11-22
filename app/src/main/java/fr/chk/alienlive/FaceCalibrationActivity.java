@@ -16,6 +16,8 @@ import android.widget.SeekBar;
 import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.widget.ScrollView;
+import android.util.DisplayMetrics;
 
 /** Calibration réelle des signaux de la caméra, contrôles personnalisés par avatar. */
 public final class FaceCalibrationActivity extends Activity {
@@ -25,6 +27,14 @@ public final class FaceCalibrationActivity extends Activity {
     private FaceTracker tracker;
     private FacePointsOverlay overlay;
     private TextView diagnostics,note;
+    private FrameLayout workspace;
+    private View titleView,instructionsView,optionsView,precisionTools;
+    private TextView zoomStatus,pointInfo;
+    private FacePointsOverlay points;
+    private boolean focused=false;
+    private float step=.005f;
+    private final android.os.Handler updateHandler=new android.os.Handler(android.os.Looper.getMainLooper());
+    private final Runnable reloadFace=()->{if(glb!=null)glb.refreshFaceRig();};
     private boolean resumed=false;
     private volatile float detectedMouth=0f,eyeLeftOpen=-1f,eyeRightOpen=-1f,facePitch=0f;
     private volatile float faceX=.5f,faceY=.5f,faceRoll=0f;
@@ -36,6 +46,13 @@ public final class FaceCalibrationActivity extends Activity {
         setContentView(R.layout.activity_face_calibration);
         current=FaceCalibration.load(this);
         TextView title=findViewById(R.id.calTitle);
+        titleView=title;
+        instructionsView=findViewById(R.id.calInstructions);
+        optionsView=findViewById(R.id.calOptions);
+        precisionTools=findViewById(R.id.calPrecisionTools);
+        workspace=findViewById(R.id.calWorkspace);
+        zoomStatus=findViewById(R.id.calZoomStatus);
+        pointInfo=findViewById(R.id.calPointInfo);
         String name=AlienData.NAMES[AlienData.character(this)];
         GlbCollection.Model m=GlbCollection.selected(this);
         if(AlienData.character(this)==AlienData.CUSTOM_CHARACTER&&m!=null)name=m.name;
@@ -59,11 +76,18 @@ public final class FaceCalibrationActivity extends Activity {
         overlay.configure(current,new FacePointsOverlay.Listener(){
             @Override public void onMove(int which,float x,float y){
                 applySettings();
+                updatePointInfo();
                 note.setText("Point "+(which==0?"œil gauche":which==1?"œil droit":"bouche")
                     +" : "+Math.round(x*100f)+" / "+Math.round(y*100f)+" %. Enregistre pour conserver.");
             }
-            @Override public void onRelease(){glb.refreshFaceRig();}
+            @Override public void onRelease(){scheduleRigRefresh();}
+            @Override public void onViewport(float zoom,float dx,float dy){
+                glb.setCalibrationViewport(zoom,dx,dy);
+                updatePointInfo();
+            }
         });
+        points=overlay;
+        setupPrecisionUi();
         RadioGroup modes=findViewById(R.id.calMode);
         modes.check(current.mode==FaceCalibration.AUTO?R.id.calAuto
             :current.mode==FaceCalibration.MANUAL?R.id.calManual:R.id.calHybrid);
@@ -146,6 +170,103 @@ public final class FaceCalibrationActivity extends Activity {
             @Override public void onSurfaceTextureUpdated(SurfaceTexture texture){}
         });
         applySettings();
+        // Lancement en mode géant par défaut : la petite prévisualisation n’est
+        // plus l’étape obligatoire pour placer des yeux et des lèvres.
+        workspace.post(()->setFocused(true));
+    }
+
+    private void setupPrecisionUi(){
+        findViewById(R.id.calPrecision).setOnClickListener(v->setFocused(!focused));
+        findViewById(R.id.calPrecisionDone).setOnClickListener(v->{
+            current.save(this);
+            scheduleRigRefresh();
+            setFocused(false);
+            Toast.makeText(this,"Points sauvegardés pour ce GLB",Toast.LENGTH_SHORT).show();
+        });
+        findViewById(R.id.calSelectLeft).setOnClickListener(v->selectPoint(0));
+        findViewById(R.id.calSelectRight).setOnClickListener(v->selectPoint(1));
+        findViewById(R.id.calSelectMouth).setOnClickListener(v->selectPoint(2));
+        findViewById(R.id.calZoomPlus).setOnClickListener(v->overlay.zoomBy(1.35f));
+        findViewById(R.id.calZoomMinus).setOnClickListener(v->overlay.zoomBy(1f/1.35f));
+        findViewById(R.id.calCenterView).setOnClickListener(v->overlay.resetViewport());
+        findViewById(R.id.calNudgeLeft).setOnClickListener(v->nudge(-step,0f));
+        findViewById(R.id.calNudgeRight).setOnClickListener(v->nudge(step,0f));
+        findViewById(R.id.calNudgeUp).setOnClickListener(v->nudge(0f,step));
+        findViewById(R.id.calNudgeDown).setOnClickListener(v->nudge(0f,-step));
+        findViewById(R.id.calStepToggle).setOnClickListener(v->{
+            step=step>.002f?.001f:.005f;
+            ((TextView)findViewById(R.id.calFineStep)).setText(step>.002f?"Pas 0,5 %":"Pas 0,1 %");
+            updatePointInfo();
+        });
+        updatePointInfo();
+    }
+    private void scheduleRigRefresh(){
+        updateHandler.removeCallbacks(reloadFace);
+        // Sur un GLB dense (Annunaki 221k sommets), reconstruire les morphs
+        // une seule fois à la fin du glisser, pas à chaque pixel.
+        updateHandler.postDelayed(reloadFace,260L);
+    }
+    private void selectPoint(int which){
+        overlay.selectPoint(which);
+        updatePointInfo();
+    }
+    private void nudge(float dx,float dy){
+        overlay.nudgeSelected(dx,dy);
+        scheduleRigRefresh();
+    }
+    private void updatePointInfo(){
+        if(overlay==null||zoomStatus==null||pointInfo==null||current==null)return;
+        int which=overlay.selectedPoint();
+        String label=which==0?"ŒIL GAUCHE":which==1?"ŒIL DROIT":"BOUCHE";
+        float[] p=current.point(which);
+        zoomStatus.setText("Zoom "+Math.round(overlay.zoom()*100f)+" %");
+        pointInfo.setText(label+"   X "+String.format(java.util.Locale.FRANCE,"%.1f",p[0]*100f)
+            +" % · Y "+String.format(java.util.Locale.FRANCE,"%.1f",p[1]*100f)+" %");
+        int[] ids={R.id.calSelectLeft,R.id.calSelectRight,R.id.calSelectMouth};
+        for(int i=0;i<ids.length;i++){
+            View button=findViewById(ids[i]);
+            if(button!=null)button.setAlpha(which==i?1f:.65f);
+        }
+    }
+    private void setFocused(boolean enable){
+        if(workspace==null||overlay==null)return;
+        focused=enable;
+        titleView.setVisibility(enable?View.GONE:View.VISIBLE);
+        instructionsView.setVisibility(enable?View.GONE:View.VISIBLE);
+        optionsView.setVisibility(enable?View.GONE:View.VISIBLE);
+        precisionTools.setVisibility(enable?View.VISIBLE:View.GONE);
+        ((Button)findViewById(R.id.calPrecision)).setText(enable?"RÉGLAGES":"GRAND ÉCRAN");
+        // Le mode AUTO n'expose pas les points personnalisés. Lors du passage
+        // en précision, activer HYBRIDE sans supprimer la détection ML Kit.
+        if(enable&&current.mode==FaceCalibration.AUTO){
+            ((RadioGroup)findViewById(R.id.calMode)).check(R.id.calHybrid);
+        }
+        overlay.setVisibility(current.mode==FaceCalibration.AUTO&&!enable?View.INVISIBLE:View.VISIBLE);
+        overlay.setPrecision(enable);
+        int h;
+        if(enable){
+            int flags=View.SYSTEM_UI_FLAG_FULLSCREEN|View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                |View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY|View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                |View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN|View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION;
+            getWindow().getDecorView().setSystemUiVisibility(flags);
+            h=getResources().getDisplayMetrics().heightPixels;
+            // Espace occupé uniquement par la scène, aucun bloc de réglage superposé.
+            h=Math.max((int)(470*getResources().getDisplayMetrics().density),h);
+            if(overlay.zoom()<1.25f)overlay.zoomBy(1.6f);
+        }else{
+            getWindow().getDecorView().setSystemUiVisibility(0);
+            h=(int)(335*getResources().getDisplayMetrics().density);
+            overlay.resetViewport();
+        }
+        android.view.ViewGroup.LayoutParams params=workspace.getLayoutParams();
+        params.height=h;
+        workspace.setLayoutParams(params);
+        ((ScrollView)findViewById(R.id.calScroll)).smoothScrollTo(0,0);
+        updatePointInfo();
+    }
+    @Override public void onBackPressed(){
+        if(focused){setFocused(false);return;}
+        super.onBackPressed();
     }
     private void addSlider(LinearLayout parent,String title,int initial,ValueChange changed){
         TextView label=new TextView(this);
@@ -204,6 +325,7 @@ public final class FaceCalibrationActivity extends Activity {
         }
     }
     @Override protected void onPause(){
+        updateHandler.removeCallbacks(reloadFace);
         resumed=false;
         if(tracker!=null)tracker.stop();
         if(glb!=null)glb.onPause();
