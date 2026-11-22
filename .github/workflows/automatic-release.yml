@@ -30,8 +30,8 @@ jobs:
         shell: bash
         run: |
           if [ -z "$APK_KEYSTORE_BASE64" ] || [ -z "$APK_KEYSTORE_PASSWORD" ] || [ -z "$APK_KEY_ALIAS" ] || [ -z "$APK_KEY_PASSWORD" ]; then
-            echo "available=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::Signed release skipped: signing secrets are not configured."
+            echo "::error::Stable APK signing secrets are missing. Cannot publish an in-app update with the existing certificate."
+            exit 1
           else
             echo "available=true" >> "$GITHUB_OUTPUT"
           fi
