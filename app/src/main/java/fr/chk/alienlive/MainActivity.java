@@ -116,7 +116,8 @@ public final class MainActivity extends Activity {
         boolean experimentalAlpha=AlienData.prefs(this).getBoolean("experimentalAlpha",false);
         boolean originalAlpha=!experimentalAlpha;
         boolean wanted=AlienData.prefs(this).getBoolean("useModel3D",true)
-                &&(selected==0 || (selected<AlienData.MODEL_FILES.length&&experimentalOthers));
+                &&(selected==0 || (selected<AlienData.MODEL_FILES.length
+                    &&(experimentalOthers||AlienData.prefs(this).getBoolean("model3d_"+selected,false))));
         if(selected!=activeModel || (selected==0&&usingOriginalAlpha!=originalAlpha)
                 || (wanted&&!previous3DWanted)){
             model3DReady=false;
