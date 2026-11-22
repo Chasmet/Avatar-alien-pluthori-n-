@@ -46,7 +46,7 @@ public final class FaceTracker {
     private HandlerThread cameraThread;
     private Handler cameraHandler;
     private int rotation=90;
-    private int intervalMs=65;
+    private int intervalMs=50;
     private float gapNeutral=.008f;
     private float openedSmooth=0f;
     private long lastStatusAt=0;
@@ -61,11 +61,11 @@ public final class FaceTracker {
             .setContourMode(FaceDetectorOptions.CONTOUR_MODE_ALL)
             .setLandmarkMode(FaceDetectorOptions.LANDMARK_MODE_ALL)
             .setClassificationMode(FaceDetectorOptions.CLASSIFICATION_MODE_ALL)
-            .setMinFaceSize(0.20f)
+            .setMinFaceSize(0.14f)
             .build();
         detector=FaceDetection.getClient(opts);
     }
-    public void setSaver(boolean saver) {intervalMs=saver?145:65;}
+    public void setSaver(boolean saver) {intervalMs=saver?120:50;}
     @SuppressLint("MissingPermission")
     public synchronized void start(){
         if(!stopped)return;
@@ -126,8 +126,10 @@ public final class FaceTracker {
                             Rect bounds=f.getBoundingBox();
                             float yaw=f.getHeadEulerAngleY();
                             float pitch=f.getHeadEulerAngleX();
-                            float px=clamp(1f-bounds.exactCenterX()/orientedWidth+yaw/180f);
-                            float py=clamp(bounds.exactCenterY()/orientedHeight+pitch/240f);
+                            // Le yaw/pitch est appliqué séparément à la tête 3D ;
+                            // ne pas le réinjecter comme déplacement de l'image.
+                            float px=clamp(1f-bounds.exactCenterX()/orientedWidth);
+                            float py=clamp(bounds.exactCenterY()/orientedHeight);
                             float roll=-f.getHeadEulerAngleZ();
                             float mouth=mouthOpen(f);
                             float lx=eyeClosed(f.getLeftEyeOpenProbability());
@@ -167,6 +169,8 @@ public final class FaceTracker {
                         CaptureRequest.Builder b=camera.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
                         b.addTarget(reader.getSurface());
                         b.set(CaptureRequest.CONTROL_AF_MODE,CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_VIDEO);
+                        b.set(CaptureRequest.CONTROL_AE_MODE,CaptureRequest.CONTROL_AE_MODE_ON);
+                        b.set(CaptureRequest.CONTROL_AE_ANTIBANDING_MODE,CaptureRequest.CONTROL_AE_ANTIBANDING_MODE_AUTO);
                         s.setRepeatingRequest(b.build(),null,cameraHandler);
                     }catch(Exception e){listener.onStatus("Démarrage caméra refusé");}
                 }
@@ -183,11 +187,17 @@ public final class FaceTracker {
         return clamp((.85f-probability)*1.5f);
     }
     private static float medianPointY(java.util.List<PointF> pts,float centerX,float tolerance){
-        float sum=0f;int count=0;
+        float sum=0f,weights=0f,nearest=Float.MAX_VALUE,nearestY=0f;
         for(PointF p:pts){
-            if(Math.abs(p.x-centerX)<tolerance){sum+=p.y;count++;}
+            float distance=Math.abs(p.x-centerX);
+            if(distance<nearest){nearest=distance;nearestY=p.y;}
+            if(distance<tolerance){
+                float weight=1f-distance/tolerance;
+                sum+=p.y*weight;weights+=weight;
+            }
         }
-        return count==0?pts.get(pts.size()/2).y:sum/count;
+        // Les contours ne présentent pas toujours un point exactement au centre.
+        return weights>0f?sum/weights:nearestY;
     }
     /** Ecart reel des levres par les contours ML Kit, normalise par largeur de visage.
       * Le seuil neutre suit lentement l'ouverture minimale observee : evite qu'un
@@ -206,8 +216,9 @@ public final class FaceTracker {
         float gap=Math.max(0f,(lowerY-upperY)/width);
         if(gap<gapNeutral)gapNeutral=gapNeutral*.80f+gap*.20f;
         else gapNeutral=gapNeutral*.998f+gap*.002f;
-        float open=clamp((gap-gapNeutral-.004f)*22.0f);
-        openedSmooth+=(open-openedSmooth)*(open>openedSmooth?.64f:.55f);
+        float open=clamp((gap-gapNeutral-.0018f)*33.0f);
+        // Ouverture rapide et retour fluide au repos, même sur la voix parlée.
+        openedSmooth+=(open-openedSmooth)*(open>openedSmooth?.72f:.53f);
         return openedSmooth;
     }
     public synchronized void stop(){

@@ -32,6 +32,15 @@ public final class Alien3DView extends GLSurfaceView {
     private final StageRenderer renderer;
     private volatile float yaw=0f,pitch=0f,roll=0f,mouth=0f,x=.5f,y=.5f;
     private volatile boolean saver=false;
+    private volatile boolean naturalModel=true;
+    private boolean framesActive=false;
+    private final Runnable frameTicker=new Runnable(){
+        @Override public void run(){
+            if(!framesActive)return;
+            requestRender();
+            postDelayed(this,saver?50L:33L);
+        }
+    };
     private volatile boolean useHead=true;
 
     public Alien3DView(Context context, Status status){
@@ -42,7 +51,7 @@ public final class Alien3DView extends GLSurfaceView {
         setZOrderOnTop(true);
         renderer=new StageRenderer(context,status);
         setRenderer(renderer);
-        setRenderMode(RENDERMODE_CONTINUOUSLY);
+        setRenderMode(RENDERMODE_WHEN_DIRTY);
         setClickable(true);
     }
     public void setPose(float x,float y,float roll,float mouth){
@@ -50,6 +59,15 @@ public final class Alien3DView extends GLSurfaceView {
     }
     public void setExpression(float yaw,float pitch){this.yaw=yaw;this.pitch=pitch;}
     public void setBatterySaver(boolean enable){saver=enable;}
+    public void setNaturalModel(boolean enable){naturalModel=enable;}
+    @Override public void onResume(){
+        super.onResume();framesActive=true;
+        removeCallbacks(frameTicker);post(frameTicker);
+    }
+    @Override public void onPause(){
+        framesActive=false;removeCallbacks(frameTicker);
+        super.onPause();
+    }
     public void setHeadTracking(boolean enable){useHead=enable;}
 
     private final class StageRenderer implements GLSurfaceView.Renderer {
@@ -57,12 +75,11 @@ public final class Alien3DView extends GLSurfaceView {
         private final Status callback;
         private final float[] projection=new float[16],view=new float[16],root=new float[16],tmp=new float[16],mvp=new float[16],local=new float[16];
         private final List<Mesh> meshes=new ArrayList<>();
-        private int program,positionLoc,uvLoc,mvpLoc,baseLoc,texLoc,useTexLoc,lightLoc;
+        private int program,positionLoc,uvLoc,mvpLoc,baseLoc,texLoc,useTexLoc,lightLoc,lipLoc;
         private int textureId;
         private boolean loaded;
         private float easedYaw,easedPitch,easedRoll,easedJaw,easedX=.5f,easedY=.5f;
-        private long lastRenderNs;
-        private final String VERTEX="attribute vec3 aPos;attribute vec2 aUv;uniform mat4 uMvp;varying vec2 vUv;varying float vLight;void main(){vUv=aUv;vLight=0.84+0.16*max(0.0,aPos.z);gl_Position=uMvp*vec4(aPos,1.0);}";
+        private final String VERTEX="attribute vec3 aPos;attribute vec2 aUv;uniform mat4 uMvp;uniform float uLip;varying vec2 vUv;varying float vLight;void main(){vec3 pos=aPos;float region=exp(-32.0*pos.x*pos.x-165.0*(pos.y+0.30)*(pos.y+0.30));pos.y+=uLip*0.022*region;pos.z+=uLip*0.009*region;vUv=aUv;vLight=0.84+0.16*max(0.0,pos.z);gl_Position=uMvp*vec4(pos,1.0);}";
         private final String FRAGMENT="precision mediump float;varying vec2 vUv;varying float vLight;uniform sampler2D uTexture;uniform vec4 uBase;uniform float uUseTexture;void main(){vec4 c=uBase;if(uUseTexture>0.5)c*=texture2D(uTexture,vUv);gl_FragColor=vec4(c.rgb*vLight,c.a);}";
         StageRenderer(Context ctx,Status status){context=ctx.getApplicationContext();callback=status;}
         @Override public void onSurfaceCreated(GL10 ignored,EGLConfig cfg){
@@ -79,6 +96,7 @@ public final class Alien3DView extends GLSurfaceView {
                 baseLoc=GLES20.glGetUniformLocation(program,"uBase");
                 texLoc=GLES20.glGetUniformLocation(program,"uTexture");
                 useTexLoc=GLES20.glGetUniformLocation(program,"uUseTexture");
+                lipLoc=GLES20.glGetUniformLocation(program,"uLip");
                 lightLoc=0;
                 readModel();
                 loaded=!meshes.isEmpty();
@@ -97,14 +115,11 @@ public final class Alien3DView extends GLSurfaceView {
         @Override public void onDrawFrame(GL10 gl){
             GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT|GLES20.GL_DEPTH_BUFFER_BIT);
             if(!loaded)return;
-            long now=System.nanoTime();
-            if(saver&&now-lastRenderNs<50_000_000L)return;
-            lastRenderNs=now;
             float blend=.16f;
             easedYaw+=(yaw-easedYaw)*blend;
             easedPitch+=(pitch-easedPitch)*blend;
             easedRoll+=(roll-easedRoll)*blend;
-            easedJaw+=(mouth-easedJaw)*.42f;
+            easedJaw+=(mouth-easedJaw)*(mouth>easedJaw?.66f:.46f);
             easedX+=(x-easedX)*blend;
             easedY+=(y-easedY)*blend;
             Matrix.setLookAtM(view,0,0f,0f,3.7f,0f,-.13f,0f,0f,1f,0f);
@@ -120,10 +135,13 @@ public final class Alien3DView extends GLSurfaceView {
             GLES20.glBindTexture(GLES20.GL_TEXTURE_2D,textureId);
             GLES20.glUniform1i(texLoc,0);
             for(Mesh mesh:meshes){
+                // Évite les volumes gris artificiels qui encadrent la texture du visage.
+                if(naturalModel&&!mesh.textured&&!mesh.jaw)continue;
                 Matrix.setIdentityM(local,0);
                 if(mesh.jaw){
-                    Matrix.translateM(local,0,0f,-.3166667f,0f);
-                    Matrix.rotateM(local,0,-easedJaw*23f,1f,0f,0f);
+                    Matrix.translateM(local,0,0f,-.3166667f-easedJaw*.010f,0f);
+                    Matrix.rotateM(local,0,-easedJaw*29f,1f,0f,0f);
+                    Matrix.scaleM(local,0,1f,1f-.025f*easedJaw,1f);
                 }
                 Matrix.multiplyMM(tmp,0,root,0,local,0);
                 float[] vm=new float[16];
@@ -132,6 +150,8 @@ public final class Alien3DView extends GLSurfaceView {
                 GLES20.glUniformMatrix4fv(mvpLoc,1,false,mvp,0);
                 GLES20.glUniform4fv(baseLoc,1,mesh.color,0);
                 GLES20.glUniform1f(useTexLoc,mesh.textured?1f:0f);
+                // Déformation locale de la lèvre haute sur les sommets texturés.
+                GLES20.glUniform1f(lipLoc,mesh.textured&&!mesh.jaw?easedJaw:0f);
                 mesh.positions.position(0);
                 GLES20.glEnableVertexAttribArray(positionLoc);
                 GLES20.glVertexAttribPointer(positionLoc,3,GLES20.GL_FLOAT,false,0,mesh.positions);

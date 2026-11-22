@@ -20,7 +20,8 @@ public final class MainActivity extends Activity {
     private VoiceEngine voice;
     private Button voiceButton;
     private boolean voiceRequested=false;
-    private View controls,header,hint;
+    private View controls,header;
+    private boolean animateLips=true;
     private boolean full=false;
     private TextView status;
     private long lastFaceDiagnostic=0L;
@@ -42,7 +43,6 @@ public final class MainActivity extends Activity {
         model3D.setVisibility(View.VISIBLE);
         controls=findViewById(R.id.controlPanel);
         header=findViewById(R.id.header);
-        hint=findViewById(R.id.liveHint);
         status=findViewById(R.id.status);
         findViewById(R.id.buttonLive).setOnClickListener(v->setLive(true));
         findViewById(R.id.buttonAlien).setOnClickListener(v->openLibrary(false));
@@ -70,11 +70,11 @@ public final class MainActivity extends Activity {
             @Override public void onPose(float x,float y,float roll,float mouth){
                 runOnUiThread(()->{
                     stage.updatePose(x,y,roll,mouth);
-                    model3D.setPose(x,y,roll,stage.getMouthLevel());
+                    model3D.setPose(x,y,roll,animateLips?stage.getMouthLevel():0f);
                     long now=android.os.SystemClock.uptimeMillis();
-                    if(now-lastFaceDiagnostic>250L){
+                    if(now-lastFaceDiagnostic>650L){
                         lastFaceDiagnostic=now;
-                        status.setText("Visage suivi | Bouche : "+(int)(stage.getMouthLevel()*100)+" % | Déplace la tête et parle");
+                        status.setText("Suivi facial actif • lèvres : "+(int)(stage.getMouthLevel()*100)+" %");
                     }
                 });
             }
@@ -95,6 +95,7 @@ public final class MainActivity extends Activity {
         stage.set3DMode(wanted&&model3DReady);
         model3D.setHeadTracking(AlienData.prefs(this).getBoolean("followHead",true));
         model3D.setBatterySaver(AlienData.prefs(this).getBoolean("saveBattery",false));
+        model3D.setNaturalModel(AlienData.prefs(this).getBoolean("naturalModel",true));
     }
     private void startVoice(){
         if(Build.VERSION.SDK_INT>=23&&checkSelfPermission(Manifest.permission.RECORD_AUDIO)!=PackageManager.PERMISSION_GRANTED){
@@ -115,7 +116,6 @@ public final class MainActivity extends Activity {
         stage.setCleanMode(enabled);
         controls.setVisibility(enabled?View.GONE:View.VISIBLE);
         header.setVisibility(enabled?View.GONE:View.VISIBLE);
-        hint.setVisibility(enabled?View.GONE:View.VISIBLE);
         if(enabled){
             getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         }else{
@@ -138,6 +138,7 @@ public final class MainActivity extends Activity {
     }
     @Override protected void onResume(){
         super.onResume();stage.reload();
+        animateLips=AlienData.prefs(this).getBoolean("animateMouth",true);
         model3D.onResume();
         sync3DMode();
         tracker.setSaver(AlienData.prefs(this).getBoolean("saveBattery",true));

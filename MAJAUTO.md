@@ -13,3 +13,6 @@ Obligatoire : signature identique, versionCode croissant, même identifiant de p
 L'APK v0.5.11 a encore l'ancien canal d'actualisation : l'installation initiale de la nouvelle version issue du dépôt dédié doit être réalisée depuis son APK direct. Les versions suivantes ont MAJAUTO depuis le dépôt dédié.
 
 Si les secrets de signature GitHub Actions ne sont pas configurés, la clé reste privée et l'APK est signé en dehors de CI. La diffusion d'une version ne doit pas être annoncée sans Release effectivement publiée.
+## Publication automatisée additionnelle (novembre 2026)
+
+Après succès du workflow Android sur main, `.github/workflows/automatic-release.yml` peut signer l'artefact Honor, comparer son certificat SHA-256 à la Release signée v0.6.9, publier un APK dans une nouvelle Release et mettre à jour `update.json` automatiquement. Les secrets requis sont `APK_KEYSTORE_BASE64` (base64 du JKS permanent v0.5.11), `APK_KEYSTORE_PASSWORD`, `APK_KEY_ALIAS`, `APK_KEY_PASSWORD`. Le workflow ne publie **pas** si ces secrets manquent ou si la signature diffère. Le workflow `publish.yml` historique reste disponible pour le canal de reconstruction des APK déjà signés. Aucun APK non signé ne doit être annoncé comme mise à jour installable.

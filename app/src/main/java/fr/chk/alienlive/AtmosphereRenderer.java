@@ -123,6 +123,7 @@ public final class AtmosphereRenderer {
         int shade=(int)(Math.max(0,-day)*36f*amount);
         p.setColor(Color.argb(shade,8,10,40));c.drawRect(0,0,w,h,p);
         drawClouds(c,w,h,t,scene,mode,amount,saver);
+        drawGroundMist(c,w,h,t,scene,mode,amount,saver);
         drawParticles(c,w,h,t,scene,mode,amount,saver,false);
         drawMovingObjects(c,w,h,t,scene,amount);
         if((mode==3||mode==5)&&scene!=1)drawRain(c,w,h,t,amount,saver,mode==5);
@@ -133,7 +134,7 @@ public final class AtmosphereRenderer {
     private void drawClouds(Canvas c,float w,float h,float t,int scene,int mode,float amount,boolean saver) {
         int count = scene==0?(saver?2:4):scene==1?(saver?3:6):(saver?6:12);
         boolean heavy=(mode>=2);
-        float movement=(mode==4?0.018f:mode==5?0.014f:.005f);
+        float movement=(mode==4?0.032f:mode==5?0.026f:.012f);
         int key=mode*10+scene;
         if(cachedCloudTint==null||tintKey!=key){
             cachedCloudTint=new PorterDuffColorFilter(
@@ -169,6 +170,23 @@ public final class AtmosphereRenderer {
                 c.drawOval(reusableOval,air);
             }
         }
+    }
+    /** Bancs de brume de profondeur intermédiaire, dérive continue sans allocations bitmap. */
+    private void drawGroundMist(Canvas c,float w,float h,float t,int scene,int mode,float amount,boolean saver){
+        if(scene==1||cloudTexture==null||mode==1)return;
+        int bands=saver?2:4;
+        for(int i=0;i<bands;i++){
+            float drift=(float)Math.sin(t*(.082f+i*.012f)+i*1.71f);
+            float px=w*(.20f+i*.23f+drift*.14f);
+            float py=h*(.64f+i*.085f)+(float)Math.sin(t*.17f+i)*h*.008f;
+            float cw=w*(.57f+i*.12f),ch=h*(.10f+i*.025f);
+            reusableOval.set(px-cw,py-ch,px+cw,py+ch);
+            air.setColorFilter(cachedCloudTint);
+            air.setAlpha((int)Math.min(255f,(mode>=4?170f:110f)*amount));
+            c.drawBitmap(cloudTexture,null,reusableOval,air);
+        }
+        air.setColorFilter(null);
+        air.setAlpha(255);
     }
     private void drawParticles(Canvas c,float w,float h,float t,int scene,int mode,float amount,boolean saver,boolean foreground) {
         int n=saver?42:95;

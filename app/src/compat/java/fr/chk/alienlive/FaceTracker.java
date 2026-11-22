@@ -39,6 +39,7 @@ public final class FaceTracker {
     private CameraDevice device;
     private CameraCaptureSession session;
     private int sensorOrientation=90;
+    private int rotation=90;
     private long lastProcessed=0;
     private int interval=160;
     private volatile boolean stopped=true;
@@ -59,7 +60,11 @@ public final class FaceTracker {
                 Integer direction=ch.get(CameraCharacteristics.LENS_FACING);
                 if(direction!=null && direction==CameraCharacteristics.LENS_FACING_FRONT) {
                     found=id;Integer orientation=ch.get(CameraCharacteristics.SENSOR_ORIENTATION);
-                    if(orientation!=null) sensorOrientation=orientation;break;
+                    if(orientation!=null) sensorOrientation=orientation;
+                    int display=((android.view.WindowManager)context.getSystemService(Context.WINDOW_SERVICE)).getDefaultDisplay().getRotation();
+                    int degrees=display==android.view.Surface.ROTATION_90?90:display==android.view.Surface.ROTATION_180?180:display==android.view.Surface.ROTATION_270?270:0;
+                    rotation=(sensorOrientation+degrees)%360;
+                    break;
                 }
             }
             if(found==null) {listener.onStatus("Aucune caméra avant détectée");stop();return;}
@@ -110,7 +115,7 @@ public final class FaceTracker {
         byte[] bytes=out.toByteArray();
         Bitmap src=BitmapFactory.decodeByteArray(bytes,0,bytes.length);
         if(src==null)return;
-        Matrix matrix=new Matrix();matrix.postRotate(sensorOrientation);matrix.postScale(-1,1);
+        Matrix matrix=new Matrix();matrix.postRotate(rotation);matrix.postScale(-1,1);
         Bitmap upright=Bitmap.createBitmap(src,0,0,src.getWidth(),src.getHeight(),matrix,false);
         src.recycle();
         int width=upright.getWidth()&~1, height=upright.getHeight();
@@ -186,5 +191,6 @@ public final class FaceTracker {
         try{if(reader!=null)reader.close();}catch(Exception ignored){}
         reader=null;
         if(thread!=null){thread.quitSafely();thread=null;handler=null;}
+        mouthBaseline=-1f;lastMouthLevel=0f;lastProcessed=0L;
     }
 }

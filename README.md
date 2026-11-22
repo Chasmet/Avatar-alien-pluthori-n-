@@ -33,3 +33,7 @@ Le projet reste gratuit et ne nécessite aucun serveur de calcul ni API payante.
 ## Prototype GLB natif
 
 Le Pluthorien Alpha inclut maintenant le véritable fichier `app/src/main/assets/pluthorien_alpha.glb`, chargé sur Android par `Alien3DView` (OpenGL ES 2.0 local). Il tourne dans le décor animé ; la mâchoire `Jaw_Lower_Animatable` se déplace avec la détection faciale. Dans Réglages, désactive `Pluthorien Alpha — véritable modèle GLB 3D` pour revenir au portrait 2D. Les autres extraterrestres restent en 2D. Ce premier GLB dérivé d'une seule image conserve une texture frontale réaliste mais ses profils sont encore approximatifs : aucun modèle facial phonémique complet n'a été créé.
+
+## Audit 22 novembre 2026
+
+L'interface utilisateur devient « Nous sommes le peuple de Pluthor » ; la pastille TikTok est supprimée. Le suivi caméra et l'animation de la mâchoire ont été affinés ; parallaxe, brume et déplacements du décor sont renforcés. Voir `AUDIT-2026-11-22.md` pour les limites physiques des lèvres du modèle GLB. Le nouveau workflow `automatic-release.yml` publie uniquement si la clé de signature permanente est présente dans les secrets GitHub et qu'elle correspond exactement au certificat historique.

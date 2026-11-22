@@ -94,7 +94,7 @@ public final class VoiceEngine {
             if(energy<0.0000001f){silentSamples+=count;}
             else {silentSamples=0;}
             if(silentSamples>SAMPLE_RATE*4){
-                state("Aucun son du micro : vérifie si TikTok le monopolise");
+                state("Aucun son du micro : vérifie si une autre application le monopolise");
                 silentSamples=0;
             }
             try {int written=0;while(written<count&&running){int n=output.write(out,written,count-written);if(n<=0)break;written+=n;}}
