@@ -1,0 +1,47 @@
+name: CHK Pluthor - APK de previsualisation direct
+on:
+  workflow_run:
+    workflows: ["CHK Alien Live - Build Android APK"]
+    types: [completed]
+permissions:
+  actions: read
+  contents: write
+jobs:
+  preview:
+    if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Récupérer les APK compilés
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_RUN: ${{ github.event.workflow_run.id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/preview"
+          gh run download "$SOURCE_RUN" --repo "$GITHUB_REPOSITORY" --name CHK-Alien-Live-Android-Debug --dir "$RUNNER_TEMP/preview"
+          test -s "$RUNNER_TEMP/preview/app-honor-debug.apk"
+          test -s "$RUNNER_TEMP/preview/app-compat-debug.apk"
+      - name: Créer des APK de test directement téléchargeables
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ github.event.workflow_run.head_sha }}
+          SOURCE_NUMBER: ${{ github.event.workflow_run.run_number }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="chk-pluthor-preview-$SOURCE_NUMBER"
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$TAG" \
+              "$RUNNER_TEMP/preview/app-honor-debug.apk#CHK-Pluthor-Honor-Preview.apk" \
+              "$RUNNER_TEMP/preview/app-compat-debug.apk#CHK-Pluthor-Android-Preview.apk" \
+              --clobber --repo "$GITHUB_REPOSITORY"
+          else
+            gh release create "$TAG" \
+              "$RUNNER_TEMP/preview/app-honor-debug.apk#CHK-Pluthor-Honor-Preview.apk" \
+              "$RUNNER_TEMP/preview/app-compat-debug.apk#CHK-Pluthor-Android-Preview.apk" \
+              --repo "$GITHUB_REPOSITORY" --target "$SOURCE_SHA" --prerelease \
+              --title "CHK Pluthor — APK de test $SOURCE_NUMBER" \
+              --notes "Prévisualisation avec modèles GLB. APK signés avec la clé de débogage Android et package fr.chk.alienlive.debug : installation en parallèle, sans modifier ni désinstaller l'ancienne application. CE N'EST PAS une mise à jour stable en place."
+          fi
