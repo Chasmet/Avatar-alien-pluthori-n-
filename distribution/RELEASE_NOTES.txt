@@ -1,1 +1,6 @@
-CHK Alien Live v0.6.3 : APK Android Honor avec suivi facial ML Kit local, presets vocaux, décors animés et icône personnalisée. Signature vérifiée et mise à jour interne depuis ce dépôt.
+CHK Alien Live 0.6.8
+- Déformation par maillage facial, lèvres et mâchoire plus réactives
+- Suivi facial ML Kit avec sensibilité et détection des paupières
+- Diagnostic bouche et tête dans la prévisualisation
+- Décors animés, huit voix au choix et mode TikTok LIVE conservés
+- Signature Android permanente conservée. Aucune désinstallation requise depuis la version stable.
