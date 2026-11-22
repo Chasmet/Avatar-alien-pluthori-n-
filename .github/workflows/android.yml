@@ -64,8 +64,12 @@ jobs:
           python3 tools/verify_glb.py
           python3 tools/verify_visual_fidelity.py
           python3 tools/verify_majauto.py
+          python3 tools/verify_custom_glb.py
           javac tools/ParseJavaSources.java
           java -cp tools ParseJavaSources
+          mkdir -p /tmp/chk-glb-tests
+          javac -d /tmp/chk-glb-tests app/src/main/java/fr/chk/alienlive/GlbMeshChunker.java tools/TestGlbChunker.java
+          java -cp /tmp/chk-glb-tests fr.chk.alienlive.TestGlbChunker
       - name: Build Honor 200 (ML Kit local)
         run: bash ./gradlew --no-daemon --stacktrace assembleHonorDebug assembleHonorRelease
       - name: Build compatibilite Android 21
