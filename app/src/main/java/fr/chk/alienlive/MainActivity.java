@@ -138,6 +138,7 @@ public final class MainActivity extends Activity {
         model3D.setVisibility(wanted?View.VISIBLE:View.GONE);
         stage.set3DMode(wanted&&model3DReady);
         model3D.setHeadTracking(AlienData.prefs(this).getBoolean("followHead",true));
+        model3D.setEyeAnimations(AlienData.prefs(this).getBoolean("animateEyes",true));
         model3D.setBatterySaver(AlienData.prefs(this).getBoolean("saveBattery",false));
         // Ne jamais supprimer la géométrie du GLB original : même silhouette que 0.6.9.
         model3D.setNaturalModel(selected!=0
