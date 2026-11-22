@@ -38,6 +38,6 @@
             android:textAllCaps="false" android:background="@drawable/btn_primary" android:textColor="#FFFFFF"/>
         <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
             android:paddingTop="20dp" android:textColor="#FFE2A8" android:textSize="14sp"
-            android:text="Important : la voix est transformée et diffusée en sortie média par CHK. TikTok mobile ne reçoit cet effet que s’il capture aussi le son interne. Sans cette option, le micro TikTok reste normal. Un casque limite le larsen."/>
+            android:text="La transformation est diffusée localement dans CHK, sans remplacer le microphone des autres applications. Pour éviter les retours acoustiques, utilise un casque."/>
     </LinearLayout>
 </ScrollView>

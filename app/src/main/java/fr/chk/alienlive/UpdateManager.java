@@ -103,6 +103,14 @@ public final class UpdateManager {
                     if(asset==null||!apkName.equals(asset.optString("name")))continue;
                     String link=asset.optString("browser_download_url","");
                     String digest=asset.optString("digest","");
+                    // Certaines anciennes réponses GitHub omettent le digest d'asset.
+                    // Le workflow inscrit aussi la somme SHA-256 dans les notes de Release.
+                    if(!digest.matches("sha256:[a-fA-F0-9]{64}")){
+                        String key=Build.VERSION.SDK_INT>=23?"sha256-honor":"sha256-compat";
+                        java.util.regex.Matcher m=java.util.regex.Pattern.compile(
+                            "(?m)^"+key+"=([a-fA-F0-9]{64})\\s*$").matcher(release.optString("body",""));
+                        if(m.find())digest="sha256:"+m.group(1);
+                    }
                     if(!digest.matches("sha256:[a-fA-F0-9]{64}"))continue;
                     String expected="https://github.com/Chasmet/Avatar-alien-pluthori-n-/releases/download/"+tag+"/"+apkName;
                     if(!expected.equals(link))continue;

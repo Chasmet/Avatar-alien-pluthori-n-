@@ -11,11 +11,12 @@ import android.os.Process;
 
 /** Local offline voice effect: granular two-tap pitch shifter and subtle robotic texture.
  *  Plays through the Android media output. It does NOT replace another app's microphone.
- *  This output is capturable ONLY if the screen-sharing app supports internal media audio.
+ *  Audio output remains within this app; Android does not replace other apps' microphone.
  */
 public final class VoiceEngine {
     public interface Listener { void onState(String message); }
-    public static final int SAMPLE_RATE = 22050;
+    public static final int SAMPLE_RATE = 44100;
+    private static final float[] PITCH={.68f,.82f,1.18f,1f,1f,.53f,.91f,.76f};
     private static final int RING = 1 << 15;
     private final Listener listener;
     private volatile boolean running;
@@ -38,6 +39,7 @@ public final class VoiceEngine {
     private long wrote = 0;
     private float phase = 0f;
     private int echoAt = 0;
+    private float previousInput=0f,highPassed=0f,noiseEnvelope=0f;
 
     public VoiceEngine(Listener listener) { this.listener = listener; }
     public synchronized boolean isRunning() { return running; }
@@ -64,6 +66,7 @@ public final class VoiceEngine {
             output = new AudioTrack(a.build(),fmt,Math.max(8192,minOut*2),AudioTrack.MODE_STREAM,AudioManager.AUDIO_SESSION_ID_GENERATE);
             if(output.getState()!=AudioTrack.STATE_INITIALIZED){release();state("Sortie audio indisponible");return false;}
             wrote=0;phase=0;echoAt=0;
+            previousInput=0f;highPassed=0f;noiseEnvelope=0f;level=0f;
             java.util.Arrays.fill(history,0f);java.util.Arrays.fill(echoHistory,0f);
             input.startRecording();
             output.play();
@@ -90,7 +93,8 @@ public final class VoiceEngine {
                 energy+=((float)in[i]/32768f)*((float)in[i]/32768f);
                 out[i] = transform(in[i]);
             }
-            level=level*.72f+(float)Math.sqrt(energy/Math.max(1,count))*.28f;
+            float measured=(float)Math.sqrt(energy/Math.max(1,count));
+            level=level*(measured>level?.48f:.82f)+measured*(measured>level?.52f:.18f);
             if(energy<0.0000001f){silentSamples+=count;}
             else {silentSamples=0;}
             if(silentSamples>SAMPLE_RATE*4){
@@ -112,35 +116,41 @@ public final class VoiceEngine {
     }
     private short transform(short sample) {
         float inputSample=sample/32768f;
-        history[(int)(wrote&(RING-1))]=inputSample;
+        // Filtrage passe-haut et réduction du souffle, sans latence supplémentaire.
+        highPassed=inputSample-previousInput+.995f*highPassed;
+        previousInput=inputSample;
+        float filtered=highPassed;
+        noiseEnvelope+=((Math.abs(filtered)>noiseEnvelope)?.10f:.003f)*(Math.abs(filtered)-noiseEnvelope);
+        if(noiseEnvelope<.002f)filtered*=.30f;
+        history[(int)(wrote&(RING-1))]=filtered;
         int mode=preset;
-        float[] voices={.68f,.82f,1.18f,1f,1f,.53f,.91f,.76f};
-        float pitch=1f+(voices[Math.min(mode,voices.length-1)]-1f)*(.45f+depth*.9f);
+        float pitch=1f+(PITCH[Math.min(mode,PITCH.length-1)]-1f)*(.45f+depth*.9f);
         float v;
-        if(mode==4 || wrote<5500){v=inputSample;}
+        if(mode==4 || wrote<SAMPLE_RATE/5){v=filtered;}
         else {
-            float sweep=2600f;
+            float sweep=SAMPLE_RATE*.1179f;
             phase+=(1f-pitch)/sweep;
             if(phase>=1f)phase-=1f;
             if(phase<0f)phase+=1f;
             float other=phase+.5f;
             if(other>=1f)other-=1f;
             float w=.5f-.5f*(float)Math.cos(2f*Math.PI*phase);
-            float a=read(1350f+sweep*phase);
-            float b=read(1350f+sweep*other);
+            float a=read(SAMPLE_RATE*.0612f+sweep*phase);
+            float b=read(SAMPLE_RATE*.0612f+sweep*other);
             v=w*a+(1f-w)*b;
         }
         if(mode!=4) {
-            float old=echoHistory[echoAt];
+            int delay=mode==7?3308:(mode==2?1544:2425);
+            float old=echoHistory[(echoAt-delay)&(echoHistory.length-1)];
             echoHistory[echoAt]=v;
             echoAt=(echoAt+1)&(echoHistory.length-1);
             float mix=mode==2?0.09f:(mode==7?.30f:.17f);
-            v=v*.92f+old*mix;
+            v=v*(1f-Math.min(.25f,mix*.35f))+old*mix;
             if(mode==1 || mode==6) v+=.10f*v*(float)Math.sin(2*Math.PI*120*wrote/SAMPLE_RATE);
             if(mode==2) v+=.07f*v*(float)Math.sin(2*Math.PI*48*wrote/SAMPLE_RATE);
         }
         wrote++;
-        v=inputSample*(1f-effectMix)+v*effectMix;
+        v=filtered*(1f-effectMix)+v*effectMix;
         float clipped = v*1.3f;
         clipped=clipped/(1f+Math.abs(clipped)*.4f);
         return (short)(Math.max(-1,Math.min(1,clipped))*32767f);
