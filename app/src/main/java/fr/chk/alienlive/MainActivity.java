@@ -14,6 +14,8 @@ import android.widget.Toast;
 
 public final class MainActivity extends Activity {
     private AlienStageView stage;
+    private Alien3DView model3D;
+    private boolean model3DReady=false;
     private FaceTracker tracker;
     private VoiceEngine voice;
     private Button voiceButton;
@@ -26,6 +28,18 @@ public final class MainActivity extends Activity {
         super.onCreate(saved);
         setContentView(R.layout.activity_main);
         stage=findViewById(R.id.alienStage);
+        model3D=new Alien3DView(this,new Alien3DView.Status(){
+            @Override public void onReady(){model3DReady=true;sync3DMode();}
+            @Override public void onError(String message){
+                model3DReady=false;sync3DMode();
+                if(status!=null)status.setText(message+" — retour à l'avatar 2D");
+            }
+        });
+        android.widget.FrameLayout frame=findViewById(R.id.stageFrame);
+        frame.addView(model3D,1,new android.widget.FrameLayout.LayoutParams(
+            android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+            android.widget.FrameLayout.LayoutParams.MATCH_PARENT));
+        model3D.setVisibility(View.VISIBLE);
         controls=findViewById(R.id.controlPanel);
         header=findViewById(R.id.header);
         hint=findViewById(R.id.liveHint);
@@ -44,6 +58,10 @@ public final class MainActivity extends Activity {
         voiceButton.setOnLongClickListener(v->{startActivity(new Intent(this,VoiceActivity.class));return true;});
         findViewById(R.id.buttonVoiceMenu).setOnClickListener(v->startActivity(new Intent(this,VoiceActivity.class)));
         findViewById(R.id.buttonSettings).setOnClickListener(v->startActivity(new Intent(this,SettingsActivity.class)));
+        model3D.setOnLongClickListener(v->{
+            if(full){setLive(false);return true;}
+            return false;
+        });
         stage.setOnLongClickListener(v->{
             if(full){setLive(false);return true;}
             return false;
@@ -52,6 +70,7 @@ public final class MainActivity extends Activity {
             @Override public void onPose(float x,float y,float roll,float mouth){
                 runOnUiThread(()->{
                     stage.updatePose(x,y,roll,mouth);
+                    model3D.setPose(x,y,roll,stage.getMouthLevel());
                     long now=android.os.SystemClock.uptimeMillis();
                     if(now-lastFaceDiagnostic>250L){
                         lastFaceDiagnostic=now;
@@ -60,10 +79,22 @@ public final class MainActivity extends Activity {
                 });
             }
             @Override public void onExpression(float yaw,float pitch,float leftBlink,float rightBlink){
-                runOnUiThread(()->stage.updateExpression(yaw,pitch,leftBlink,rightBlink));
+                runOnUiThread(()->{
+                    stage.updateExpression(yaw,pitch,leftBlink,rightBlink);
+                    model3D.setExpression(yaw,pitch);
+                });
             }
             @Override public void onStatus(String message){runOnUiThread(()->status.setText(message));}
         });
+    }
+    private void sync3DMode(){
+        if(model3D==null||stage==null)return;
+        boolean wanted=AlienData.character(this)==0
+            &&AlienData.prefs(this).getBoolean("useModel3D",true);
+        model3D.setVisibility(wanted?View.VISIBLE:View.GONE);
+        stage.set3DMode(wanted&&model3DReady);
+        model3D.setHeadTracking(AlienData.prefs(this).getBoolean("followHead",true));
+        model3D.setBatterySaver(AlienData.prefs(this).getBoolean("saveBattery",false));
     }
     private void startVoice(){
         if(Build.VERSION.SDK_INT>=23&&checkSelfPermission(Manifest.permission.RECORD_AUDIO)!=PackageManager.PERMISSION_GRANTED){
@@ -107,6 +138,8 @@ public final class MainActivity extends Activity {
     }
     @Override protected void onResume(){
         super.onResume();stage.reload();
+        model3D.onResume();
+        sync3DMode();
         tracker.setSaver(AlienData.prefs(this).getBoolean("saveBattery",true));
         if(voiceRequested) startVoice();
         if(Build.VERSION.SDK_INT>=23&&checkSelfPermission(Manifest.permission.CAMERA)!=PackageManager.PERMISSION_GRANTED){
@@ -129,7 +162,7 @@ public final class MainActivity extends Activity {
             else {voiceRequested=false;status.setText("Autorise le micro pour modifier la voix");}
         }
     }
-    @Override protected void onPause(){tracker.stop();if(voice!=null)voice.stop();super.onPause();}
+    @Override protected void onPause(){tracker.stop();model3D.onPause();if(voice!=null)voice.stop();super.onPause();}
     @Override protected void onDestroy(){if(voice!=null)voice.stop();super.onDestroy();}
     @Override public void onBackPressed(){if(full)setLive(false);else super.onBackPressed();}
 }

@@ -30,3 +30,6 @@ Le téléphone consulte `https://raw.githubusercontent.com/Chasmet/Avatar-alien-
 **Migration depuis v0.5.11 :** cette ancienne version pointe encore vers l'ancien dépôt. Installer une fois la nouvelle version depuis ce dépôt **par-dessus** v0.5.11, sans la désinstaller, dès lors que la signature est identique. Les futures versions utiliseront le nouveau canal.
 
 Le projet reste gratuit et ne nécessite aucun serveur de calcul ni API payante.
+## Prototype GLB natif
+
+Le Pluthorien Alpha inclut maintenant le véritable fichier `app/src/main/assets/pluthorien_alpha.glb`, chargé sur Android par `Alien3DView` (OpenGL ES 2.0 local). Il tourne dans le décor animé ; la mâchoire `Jaw_Lower_Animatable` se déplace avec la détection faciale. Dans Réglages, désactive `Pluthorien Alpha — véritable modèle GLB 3D` pour revenir au portrait 2D. Les autres extraterrestres restent en 2D. Ce premier GLB dérivé d'une seule image conserve une texture frontale réaliste mais ses profils sont encore approximatifs : aucun modèle facial phonémique complet n'a été créé.

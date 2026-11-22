@@ -28,7 +28,7 @@ public final class AlienStageView extends View {
     private final AtmosphereRenderer atmosphere;
     private volatile float headX=.5f,headY=.5f,headRoll=0f;
     private volatile boolean faceFound=false;
-    private boolean clean=false,animate=true,saveBattery=true;
+    private boolean clean=false,animate=true,saveBattery=true,show3D=false;
     private int selectedScene=0, selectedMode=0,intensity=65;
     private long lastReload=0;
 
@@ -63,6 +63,7 @@ public final class AlienStageView extends View {
         invalidate();
     }
     public void setCleanMode(boolean enable) { clean=enable;invalidate(); }
+    public void set3DMode(boolean enable){show3D=enable;postInvalidateOnAnimation();}
     public void updatePose(float x,float y,float roll,float mouth) {
         float gain=Math.max(.2f,Math.min(3f,mouthSensitivity));
         headX+=(x-headX)*.34f;headY+=(y-headY)*.32f;headRoll+=(roll-headRoll)*.30f;
@@ -87,7 +88,7 @@ public final class AlienStageView extends View {
         c.drawColor(Color.rgb(7,7,22));
         if(sceneBitmap!=null)drawCover(c,sceneBitmap,w,h);
         if(animate)atmosphere.renderBehind(c,w,h,selectedScene,selectedMode,intensity,headX,headY,saveBattery);
-        if(characterBitmap!=null) {
+        if(characterBitmap!=null&&!show3D) {
             long time=SystemClock.uptimeMillis();
             boolean freshFace=faceFound&&(time-lastFaceAt)<1700L;
             if(!freshFace)mouthOpen*=.80f;
