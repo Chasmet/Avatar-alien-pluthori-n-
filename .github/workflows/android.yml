@@ -66,7 +66,7 @@ jobs:
         run: bash ./gradlew --no-daemon --stacktrace assembleHonorDebug assembleHonorRelease
       - name: Build compatibilite Android 21
         run: bash ./gradlew --no-daemon --stacktrace assembleCompatDebug
-      - name: Contrôler les vrais APK avant publication MAJAUTO
+      - name: Vérifier les APK préversion avant publication MAJAUTO
         shell: bash
         run: |
           set -euo pipefail
@@ -78,129 +78,15 @@ jobs:
             test -s "$APK"
             unzip -tqq "$APK"
             "$AAPT" dump badging "$APK" | grep "package: name='fr.chk.alienlive.preview'"
-            "$AAPT" list "$APK" | grep '^AndroidManifest.xml
-          test -s app/build/outputs/apk/honor/release/app-honor-release-unsigned.apk
-          "$ANDROID_HOME/build-tools/34.0.0/aapt" dump badging app/build/outputs/apk/honor/release/app-honor-release-unsigned.apk | grep "package: name='fr.chk.alienlive'"
-      - uses: actions/upload-artifact@v4
-        with:
-          name: CHK-Alien-Live-Honor-Release-Unsigned
-          path: app/build/outputs/apk/honor/release/*.apk
-          if-no-files-found: error
-      - uses: actions/upload-artifact@v4
-        with:
-          name: CHK-Alien-Live-Android-Debug
-          path: |
-            app/build/outputs/apk/honor/debug/*.apk
-            app/build/outputs/apk/compat/debug/*.apk
-          if-no-files-found: error
-
-      - name: Publier les APK de prévisualisation et le canal MAJAUTO
-        if: github.ref == 'refs/heads/main'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          APK="app/build/outputs/apk/honor/debug/app-honor-debug.apk"
-          COMPAT="app/build/outputs/apk/compat/debug/app-compat-debug.apk"
-          test -s "$APK" && test -s "$COMPAT"
-          BADGING=$("$ANDROID_HOME/build-tools/34.0.0/aapt" dump badging "$APK" | head -n 1)
-          echo "$BADGING" | grep "package: name='fr.chk.alienlive.preview'"
-          VERSION=$(printf '%s\n' "$BADGING" | sed -n "s/.*versionName='\([^']*\)'.*/\1/p")
-          CODE=$(printf '%s\n' "$BADGING" | sed -n "s/.*versionCode='\([^']*\)'.*/\1/p")
-          test -n "$VERSION" && test -n "$CODE"
-          TAG="chk-pluthor-preview-v2-$GITHUB_RUN_NUMBER"
-          SIGNER=$("$ANDROID_HOME/build-tools/34.0.0/apksigner" verify --print-certs "$APK" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | head -n 1)
-          test -n "$SIGNER"
-          # Évite toute fausse MAJAUTO Android si la clé a changé.
-          if [ -f update-preview-v2.json ]; then
-            EXPECTED=$(python3 -c 'import json;print(json.load(open("update-preview-v2.json"))["signerSha256"])')
-            if [ "$EXPECTED" != "$SIGNER" ]; then
-              echo "::error::APK preview signé avec un autre certificat. Publication refusée."
-              exit 1
-            fi
-          fi
-          # Métadonnées vérifiables même si l'API GitHub omet l'attribut digest.
-          SHA_HONOR=$(sha256sum "$APK" | cut -d' ' -f1)
-          SHA_COMPAT=$(sha256sum "$COMPAT" | cut -d' ' -f1)
-          NOTES=$(printf 'CHK Pluthor %s : lèvres synchronisées caméra/microphone, voix 44,1 kHz, cinq GLB accessibles, rendu original préservé.\nSignataire SHA-256 : %s\nsha256-honor=%s\nsha256-compat=%s\n' "$VERSION" "$SIGNER" "$SHA_HONOR" "$SHA_COMPAT")
-          # Signature figée par le cache. Une expiration bloque la compilation.
-          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release upload "$TAG" "$APK" "$COMPAT" --clobber --repo "$GITHUB_REPOSITORY"
-          else
-            gh release create "$TAG" "$APK#CHK-Pluthor-Honor-Preview.apk" "$COMPAT#CHK-Pluthor-Android-Preview.apk" \
-              --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease \
-              --title "CHK Pluthor — Préversion $VERSION" \
-              --notes "$NOTES"
-          fi
-          gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --notes "$NOTES"
-
-            "$AAPT" list "$APK" | grep '^classes.dex
-          test -s app/build/outputs/apk/honor/release/app-honor-release-unsigned.apk
-          "$ANDROID_HOME/build-tools/34.0.0/aapt" dump badging app/build/outputs/apk/honor/release/app-honor-release-unsigned.apk | grep "package: name='fr.chk.alienlive'"
-      - uses: actions/upload-artifact@v4
-        with:
-          name: CHK-Alien-Live-Honor-Release-Unsigned
-          path: app/build/outputs/apk/honor/release/*.apk
-          if-no-files-found: error
-      - uses: actions/upload-artifact@v4
-        with:
-          name: CHK-Alien-Live-Android-Debug
-          path: |
-            app/build/outputs/apk/honor/debug/*.apk
-            app/build/outputs/apk/compat/debug/*.apk
-          if-no-files-found: error
-
-      - name: Publier les APK de prévisualisation et le canal MAJAUTO
-        if: github.ref == 'refs/heads/main'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          APK="app/build/outputs/apk/honor/debug/app-honor-debug.apk"
-          COMPAT="app/build/outputs/apk/compat/debug/app-compat-debug.apk"
-          test -s "$APK" && test -s "$COMPAT"
-          BADGING=$("$ANDROID_HOME/build-tools/34.0.0/aapt" dump badging "$APK" | head -n 1)
-          echo "$BADGING" | grep "package: name='fr.chk.alienlive.preview'"
-          VERSION=$(printf '%s\n' "$BADGING" | sed -n "s/.*versionName='\([^']*\)'.*/\1/p")
-          CODE=$(printf '%s\n' "$BADGING" | sed -n "s/.*versionCode='\([^']*\)'.*/\1/p")
-          test -n "$VERSION" && test -n "$CODE"
-          TAG="chk-pluthor-preview-v2-$GITHUB_RUN_NUMBER"
-          SIGNER=$("$ANDROID_HOME/build-tools/34.0.0/apksigner" verify --print-certs "$APK" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | head -n 1)
-          test -n "$SIGNER"
-          # Évite toute fausse MAJAUTO Android si la clé a changé.
-          if [ -f update-preview-v2.json ]; then
-            EXPECTED=$(python3 -c 'import json;print(json.load(open("update-preview-v2.json"))["signerSha256"])')
-            if [ "$EXPECTED" != "$SIGNER" ]; then
-              echo "::error::APK preview signé avec un autre certificat. Publication refusée."
-              exit 1
-            fi
-          fi
-          # Métadonnées vérifiables même si l'API GitHub omet l'attribut digest.
-          SHA_HONOR=$(sha256sum "$APK" | cut -d' ' -f1)
-          SHA_COMPAT=$(sha256sum "$COMPAT" | cut -d' ' -f1)
-          NOTES=$(printf 'CHK Pluthor %s : lèvres synchronisées caméra/microphone, voix 44,1 kHz, cinq GLB accessibles, rendu original préservé.\nSignataire SHA-256 : %s\nsha256-honor=%s\nsha256-compat=%s\n' "$VERSION" "$SIGNER" "$SHA_HONOR" "$SHA_COMPAT")
-          # Signature figée par le cache. Une expiration bloque la compilation.
-          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release upload "$TAG" "$APK" "$COMPAT" --clobber --repo "$GITHUB_REPOSITORY"
-          else
-            gh release create "$TAG" "$APK#CHK-Pluthor-Honor-Preview.apk" "$COMPAT#CHK-Pluthor-Android-Preview.apk" \
-              --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease \
-              --title "CHK Pluthor — Préversion $VERSION" \
-              --notes "$NOTES"
-          fi
-          gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --notes "$NOTES"
-
+            "$AAPT" list "$APK" | grep '^AndroidManifest.xml$'
+            "$AAPT" list "$APK" | grep '^classes.dex$'
           done
           "$SIGNER" verify --min-sdk-version 23 --print-certs "$HONOR"
           "$SIGNER" verify --min-sdk-version 21 --print-certs "$COMPAT"
-          HONOR_PACKAGE=$("$AAPT" dump badging "$HONOR" | head -n1)
-          COMPAT_PACKAGE=$("$AAPT" dump badging "$COMPAT" | head -n1)
-          HONOR_VERSION=$(echo "$HONOR_PACKAGE" | sed -n "s/.*versionCode='\\([^']*\\)'.*/\\1/p")
-          COMPAT_VERSION=$(echo "$COMPAT_PACKAGE" | sed -n "s/.*versionCode='\\([^']*\\)'.*/\\1/p")
-          test -n "$HONOR_VERSION" && test "$HONOR_VERSION" = "$COMPAT_VERSION"
-          echo "Contrôle ZIP, APK, package, versions et signatures : OK"
+          H_CODE=$("$AAPT" dump badging "$HONOR" | head -1 | sed -E "s/.*versionCode='([0-9]+)'.*/\1/")
+          C_CODE=$("$AAPT" dump badging "$COMPAT" | head -1 | sed -E "s/.*versionCode='([0-9]+)'.*/\1/")
+          test -n "$H_CODE" && test "$H_CODE" = "$C_CODE"
+          echo "APK ZIP, package, version et signature contrôlés"
       - name: Verifier le package
         run: |
           test -s app/build/outputs/apk/honor/release/app-honor-release-unsigned.apk
