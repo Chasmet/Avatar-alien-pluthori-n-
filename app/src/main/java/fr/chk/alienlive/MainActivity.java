@@ -19,6 +19,7 @@ public final class MainActivity extends Activity {
     private int activeModel=-1;
     private boolean usingOriginalAlpha=false;
     private boolean previous3DWanted=false;
+    private String activeCustomGlbId="";
     private FaceTracker tracker;
     private VoiceEngine voice;
     private Button voiceButton;
@@ -115,15 +116,23 @@ public final class MainActivity extends Activity {
         boolean experimentalOthers=AlienData.prefs(this).getBoolean("experimental3D",false);
         boolean experimentalAlpha=AlienData.prefs(this).getBoolean("experimentalAlpha",false);
         boolean originalAlpha=!experimentalAlpha;
+        GlbCollection.Model imported=selected==AlienData.CUSTOM_CHARACTER?GlbCollection.selected(this):null;
+        boolean importedWanted=imported!=null;
         boolean wanted=AlienData.prefs(this).getBoolean("useModel3D",true)
-                &&(selected==0 || (selected<AlienData.MODEL_FILES.length
+                &&(importedWanted||selected==0||(selected<AlienData.MODEL_FILES.length
                     &&(experimentalOthers||AlienData.prefs(this).getBoolean("model3d_"+selected,false))));
-        if(selected!=activeModel || (selected==0&&usingOriginalAlpha!=originalAlpha)
+        String nextCustomId=imported==null?"":imported.id;
+        if(selected!=activeModel || !nextCustomId.equals(activeCustomGlbId)
+                || (selected==0&&usingOriginalAlpha!=originalAlpha)
                 || (wanted&&!previous3DWanted)){
             model3DReady=false;
             activeModel=selected;
+            activeCustomGlbId=nextCustomId;
             usingOriginalAlpha=originalAlpha;
-            if(wanted)model3D.setCharacter(selected,originalAlpha);
+            if(wanted){
+                if(importedWanted)model3D.setCustomModel(imported.file);
+                else model3D.setCharacter(selected,originalAlpha);
+            }
         }
         previous3DWanted=wanted;
         model3D.setVisibility(wanted?View.VISIBLE:View.GONE);
