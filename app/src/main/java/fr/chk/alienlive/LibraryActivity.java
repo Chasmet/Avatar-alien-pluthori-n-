@@ -32,6 +32,20 @@ public final class LibraryActivity extends Activity {
             intent.setType("image/*");intent.addCategory(Intent.CATEGORY_OPENABLE);
             startActivityForResult(intent,REQUEST_PICK);
         });
+        Button modelToggle=findViewById(R.id.toggleAvatar3D);
+        if(!scene){
+            modelToggle.setVisibility(View.VISIBLE);
+            refresh3DButton(modelToggle);
+            modelToggle.setOnClickListener(v->{
+                int character=AlienData.character(this);
+                if(character<=0||character>=AlienData.MODEL_FILES.length)return;
+                String key="model3d_"+character;
+                boolean newValue=!AlienData.prefs(this).getBoolean(key,false);
+                AlienData.prefs(this).edit().putBoolean(key,newValue).apply();
+                refresh3DButton(modelToggle);
+                Toast.makeText(this,newValue?"GLB 3D activé pour ce personnage":"Portrait original restauré",Toast.LENGTH_SHORT).show();
+            });
+        }
         grid=findViewById(R.id.gallery);
         final String[] names=scene?AlienData.SCENES:AlienData.NAMES;
         final int[] previews=scene?AlienData.BACKGROUNDS:AlienData.PORTRAITS;
@@ -65,6 +79,17 @@ public final class LibraryActivity extends Activity {
             }
             AlienData.prefs(this).edit().putInt(scene?"scene":"character",position).apply();finish();
         });
+    }
+    private void refresh3DButton(Button button){
+        int character=AlienData.character(this);
+        if(character==0){button.setText("Alpha : GLB original conservé");button.setEnabled(false);}
+        else if(character>=AlienData.MODEL_FILES.length){button.setText("Image personnalisée : mode 2D");button.setEnabled(false);}
+        else{
+            boolean active=AlienData.prefs(this).getBoolean("model3d_"+character,false);
+            button.setEnabled(true);
+            button.setText(active?"Désactiver le GLB 3D — "+AlienData.NAMES[character]
+                :"Activer le GLB 3D — "+AlienData.NAMES[character]);
+        }
     }
     @Override protected void onActivityResult(int request,int result,Intent intent){
         super.onActivityResult(request,result,intent);
