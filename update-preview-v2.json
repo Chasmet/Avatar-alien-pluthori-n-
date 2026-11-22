@@ -1,0 +1,9 @@
+{
+  "versionCode": 20019,
+  "versionName": "0.6.19",
+  "packageName": "fr.chk.alienlive.preview",
+  "apkUrl": "https://github.com/Chasmet/Avatar-alien-pluthori-n-/releases/download/chk-pluthor-preview-v2-19/app-honor-debug.apk",
+  "sha256": "448e4e58d0ed18b5dc3c45af974dcd62b333f685e7e3e12761df03ad3e1a2976",
+  "signerSha256": "16ebcbaefbcefe3490167b17ff750e8beff8fe7a5f0dffd47c2e272b614d9440",
+  "notes": "Certificat de préversion uniquement. Ne contient pas la clé privée. Le workflow vérifie son empreinte et doit arrêter la publication si la clé change."
+}

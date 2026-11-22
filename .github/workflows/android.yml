@@ -99,6 +99,14 @@ jobs:
           TAG="chk-pluthor-preview-v2-$GITHUB_RUN_NUMBER"
           SIGNER=$("$ANDROID_HOME/build-tools/34.0.0/apksigner" verify --print-certs "$APK" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | head -n 1)
           test -n "$SIGNER"
+          # Évite toute fausse MAJAUTO Android si la clé a changé.
+          if [ -f update-preview-v2.json ]; then
+            EXPECTED=$(python3 -c 'import json;print(json.load(open("update-preview-v2.json"))["signerSha256"])')
+            if [ "$EXPECTED" != "$SIGNER" ]; then
+              echo "::error::APK preview signé avec un autre certificat. Publication refusée."
+              exit 1
+            fi
+          fi
           # Signature figée par le cache. Une expiration bloque la compilation.
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release upload "$TAG" "$APK#CHK-Pluthor-Honor-Preview.apk" "$COMPAT#CHK-Pluthor-Android-Preview.apk" --clobber --repo "$GITHUB_REPOSITORY"
