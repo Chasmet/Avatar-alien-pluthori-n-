@@ -73,6 +73,7 @@ jobs:
           python3 tools/verify_visual_fidelity.py
           python3 tools/verify_majauto.py
           python3 tools/verify_custom_glb.py
+          python3 tools/verify_face_calibration.py
           javac tools/ParseJavaSources.java
           java -cp tools ParseJavaSources
           mkdir -p /tmp/chk-glb-tests
