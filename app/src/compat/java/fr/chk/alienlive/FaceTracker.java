@@ -18,11 +18,14 @@ import android.hardware.camera2.CaptureRequest;
 import android.media.FaceDetector;
 import android.media.Image;
 import android.media.ImageReader;
+import android.graphics.SurfaceTexture;
+import android.view.TextureView;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.SystemClock;
 import android.util.Log;
 import android.util.Size;
+import android.view.Surface;
 
 import java.io.ByteArrayOutputStream;
 import java.nio.ByteBuffer;
@@ -33,6 +36,8 @@ public final class FaceTracker {
     public interface Listener { void onPose(float x,float y,float roll,float mouth); void onStatus(String status); default void onExpression(float yaw,float pitch,float blinkLeft,float blinkRight){} default void onFacialMeasurements(float leftEyeOpen,float rightEyeOpen,float mouth,float smile){} }
     private final Context context;
     private final Listener listener;
+    private final TextureView preview;
+    private Surface previewSurface;
     private HandlerThread thread;
     private Handler handler;
     private ImageReader reader;
@@ -45,7 +50,8 @@ public final class FaceTracker {
     private volatile boolean stopped=true;
     private float mouthBaseline=-1f, lastMouthLevel=0f;
 
-    public FaceTracker(Context c, Listener l) {context=c;listener=l;}
+    public FaceTracker(Context c, Listener l){this(c,l,null);}
+    public FaceTracker(Context c, Listener l,TextureView previewView){context=c;listener=l;preview=previewView;}
     public void setSaver(boolean value) {interval=value?260:115;}
     @SuppressLint("MissingPermission")
     public void start() {
@@ -91,13 +97,24 @@ public final class FaceTracker {
     private void configure(){
         if(device==null||reader==null||stopped)return;
         try {
-            device.createCaptureSession(Arrays.asList(reader.getSurface()),new CameraCaptureSession.StateCallback(){
+            java.util.List<Surface> surfaces=new java.util.ArrayList<>();
+            surfaces.add(reader.getSurface());
+            if(preview!=null&&preview.isAvailable()){
+                SurfaceTexture tex=preview.getSurfaceTexture();
+                if(tex!=null){
+                    tex.setDefaultBufferSize(reader.getWidth(),reader.getHeight());
+                    previewSurface=new Surface(tex);
+                    surfaces.add(previewSurface);
+                }
+            }
+            device.createCaptureSession(surfaces,new CameraCaptureSession.StateCallback(){
                 @Override public void onConfigured(CameraCaptureSession s){
                     if(stopped){s.close();return;}
                     session=s;
                     try {
                         CaptureRequest.Builder b=device.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
                         b.addTarget(reader.getSurface());
+                        if(previewSurface!=null)b.addTarget(previewSurface);
                         b.set(CaptureRequest.CONTROL_AF_MODE,CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_VIDEO);
                         s.setRepeatingRequest(b.build(),null,handler);
                         listener.onStatus("Suivi visage et lèvres (expérimental)");
@@ -190,6 +207,8 @@ public final class FaceTracker {
         try{if(device!=null)device.close();}catch(Exception ignored){}
         device=null;
         try{if(reader!=null)reader.close();}catch(Exception ignored){}
+        try{if(previewSurface!=null)previewSurface.release();}catch(Exception ignored){}
+        previewSurface=null;
         reader=null;
         if(thread!=null){thread.quitSafely();thread=null;handler=null;}
         mouthBaseline=-1f;lastMouthLevel=0f;lastProcessed=0L;
