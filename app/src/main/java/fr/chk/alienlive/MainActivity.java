@@ -16,6 +16,8 @@ public final class MainActivity extends Activity {
     private AlienStageView stage;
     private Alien3DView model3D;
     private boolean model3DReady=false;
+    private int activeModel=-1;
+    private boolean usingOriginalAlpha=false;
     private FaceTracker tracker;
     private VoiceEngine voice;
     private Button voiceButton;
@@ -89,7 +91,16 @@ public final class MainActivity extends Activity {
     }
     private void sync3DMode(){
         if(model3D==null||stage==null)return;
-        boolean wanted=AlienData.character(this)==0
+        int selected=AlienData.character(this);
+        boolean originalAlpha=AlienData.prefs(this).getBoolean("originalAlphaModel",false);
+        if(selected!=activeModel || (selected==0 && usingOriginalAlpha!=originalAlpha)){
+            model3DReady=false;
+            activeModel=selected;
+            usingOriginalAlpha=originalAlpha;
+            if(selected<AlienData.MODEL_FILES.length)
+                model3D.setCharacter(selected,originalAlpha);
+        }
+        boolean wanted=selected<AlienData.MODEL_FILES.length
             &&AlienData.prefs(this).getBoolean("useModel3D",true);
         model3D.setVisibility(wanted?View.VISIBLE:View.GONE);
         stage.set3DMode(wanted&&model3DReady);

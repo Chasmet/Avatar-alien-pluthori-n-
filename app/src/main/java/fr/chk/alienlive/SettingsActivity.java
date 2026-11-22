@@ -19,6 +19,7 @@ public final class SettingsActivity extends Activity {
         setup(R.id.animateMouth,"animateMouth",true);
         setup(R.id.useModel3D,"useModel3D",true);
         setup(R.id.naturalModel,"naturalModel",true);
+        setup(R.id.originalAlphaModel,"originalAlphaModel",false);
         final SeekBar sensitivity=findViewById(R.id.mouthSensitivity);
         sensitivity.setProgress(AlienData.prefs(this).getInt("mouthSensitivity",75));
         final TextView sensitivityText=findViewById(R.id.mouthSensitivityLabel);

@@ -6,6 +6,12 @@ import android.content.SharedPreferences;
 public final class AlienData {
     public static final String[] NAMES = {"Pluthorien Alpha", "Pluthorien Sage", "Pluthorien Gardien", "Pluthorien Ombre", "Annunaki ancien", "Personnage personnalisé"};
     public static final int[] PORTRAITS = {R.drawable.alien_alpha, R.drawable.alien_sage, R.drawable.alien_guard, R.drawable.alien_shadow, R.drawable.alien_annunaki, R.drawable.alien_alpha};
+    /** Modèles GLB animables inclus hors ligne pour les cinq personnages prédéfinis. */
+    public static final String[] MODEL_FILES = {
+        "pluthorien_alpha_rig.glb", "pluthorien_sage_rig.glb",
+        "pluthorien_guard_rig.glb", "pluthorien_shadow_rig.glb",
+        "pluthorien_annunaki_rig.glb"
+    };
     public static final String[] SCENES = {"Passerelle de Pluthor", "Espace profond", "Monde annunaki", "Décor personnalisé"};
     public static final int[] BACKGROUNDS = {R.drawable.scene_bridge, R.drawable.scene_space, R.drawable.scene_annunaki, R.drawable.scene_bridge};
     public static final int CUSTOM_CHARACTER=5;

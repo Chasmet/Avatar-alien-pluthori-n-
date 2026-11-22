@@ -33,6 +33,8 @@ public final class Alien3DView extends GLSurfaceView {
     private volatile float yaw=0f,pitch=0f,roll=0f,mouth=0f,x=.5f,y=.5f;
     private volatile boolean saver=false;
     private volatile boolean naturalModel=true;
+    private volatile String activeAsset=AlienData.MODEL_FILES[0];
+    private volatile boolean reloadModel=false;
     private boolean framesActive=false;
     private final Runnable frameTicker=new Runnable(){
         @Override public void run(){
@@ -60,6 +62,15 @@ public final class Alien3DView extends GLSurfaceView {
     public void setExpression(float yaw,float pitch){this.yaw=yaw;this.pitch=pitch;}
     public void setBatterySaver(boolean enable){saver=enable;}
     public void setNaturalModel(boolean enable){naturalModel=enable;}
+    public void setCharacter(int index,boolean originalAlpha){
+        if(index<0||index>=AlienData.MODEL_FILES.length)return;
+        String asset=index==0&&originalAlpha?"pluthorien_alpha.glb":AlienData.MODEL_FILES[index];
+        if(!asset.equals(activeAsset)){
+            activeAsset=asset;
+            reloadModel=true;
+            requestRender();
+        }
+    }
     @Override public void onResume(){
         super.onResume();framesActive=true;
         removeCallbacks(frameTicker);post(frameTicker);
@@ -98,6 +109,7 @@ public final class Alien3DView extends GLSurfaceView {
                 useTexLoc=GLES20.glGetUniformLocation(program,"uUseTexture");
                 lipLoc=GLES20.glGetUniformLocation(program,"uLip");
                 lightLoc=0;
+                reloadModel=false;
                 readModel();
                 loaded=!meshes.isEmpty();
                 if(loaded)post(()->callback.onReady());
@@ -114,6 +126,19 @@ public final class Alien3DView extends GLSurfaceView {
         }
         @Override public void onDrawFrame(GL10 gl){
             GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT|GLES20.GL_DEPTH_BUFFER_BIT);
+            if(reloadModel){
+                reloadModel=false;
+                try{
+                    readModel();
+                    loaded=!meshes.isEmpty();
+                    if(loaded)post(()->callback.onReady());
+                    else post(()->callback.onError("Modèle 3D vide"));
+                }catch(Exception error){
+                    loaded=false;
+                    Log.e("CHK-GLB","Chargement de "+activeAsset,error);
+                    post(()->callback.onError("Modèle 3D indisponible"));
+                }
+            }
             if(!loaded)return;
             float blend=.16f;
             easedYaw+=(yaw-easedYaw)*blend;
@@ -139,9 +164,10 @@ public final class Alien3DView extends GLSurfaceView {
                 if(naturalModel&&!mesh.textured&&!mesh.jaw)continue;
                 Matrix.setIdentityM(local,0);
                 if(mesh.jaw){
-                    Matrix.translateM(local,0,0f,-.3166667f-easedJaw*.010f,0f);
-                    Matrix.rotateM(local,0,-easedJaw*29f,1f,0f,0f);
-                    Matrix.scaleM(local,0,1f,1f-.025f*easedJaw,1f);
+                    // Rotation autour de la ligne des lèvres et non de l'origine.
+                    Matrix.translateM(local,0,0f,-.300f-easedJaw*.018f,0f);
+                    Matrix.rotateM(local,0,-easedJaw*21f,1f,0f,0f);
+                    Matrix.translateM(local,0,0f,.300f,0f);
                 }
                 Matrix.multiplyMM(tmp,0,root,0,local,0);
                 float[] vm=new float[16];
@@ -171,8 +197,13 @@ public final class Alien3DView extends GLSurfaceView {
         }
         private void readModel() throws Exception {
             meshes.clear();
+            if(textureId!=0){
+                int[] ids={textureId};
+                GLES20.glDeleteTextures(1,ids,0);
+                textureId=0;
+            }
             byte[] bytes;
-            try(InputStream in=context.getAssets().open("pluthorien_alpha.glb")){
+            try(InputStream in=context.getAssets().open(activeAsset)){
                 ByteArrayOutputStream out=new ByteArrayOutputStream();byte[] block=new byte[32768];int n;
                 while((n=in.read(block))>=0){out.write(block,0,n);if(out.size()>25_000_000)throw new IllegalArgumentException("Model too large");}
                 bytes=out.toByteArray();

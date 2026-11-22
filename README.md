@@ -37,3 +37,7 @@ Le Pluthorien Alpha inclut maintenant le véritable fichier `app/src/main/assets
 ## Audit 22 novembre 2026
 
 L'interface utilisateur devient « Nous sommes le peuple de Pluthor » ; la pastille TikTok est supprimée. Le suivi caméra et l'animation de la mâchoire ont été affinés ; parallaxe, brume et déplacements du décor sont renforcés. Voir `AUDIT-2026-11-22.md` pour les limites physiques des lèvres du modèle GLB. Le nouveau workflow `automatic-release.yml` publie uniquement si la clé de signature permanente est présente dans les secrets GitHub et qu'elle correspond exactement au certificat historique.
+
+## Les cinq modèles GLB (mise à jour du 22 novembre 2026)
+
+Les cinq modèles prédéfinis sont inclus dans `app/src/main/assets/` : `pluthorien_alpha_rig.glb`, `pluthorien_sage_rig.glb`, `pluthorien_guard_rig.glb`, `pluthorien_shadow_rig.glb` et `pluthorien_annunaki_rig.glb`. Les modèles ont été générés à partir des portraits originaux de l'application, avec tête texturée, buste et partie inférieure de mâchoire distincte `Jaw_Lower_Animatable`. Le GLB Alpha historique reste disponible avec l'option « modèle 3D d'origine » dans les réglages. Les fichiers utilisent glTF 2.0 avec `EXT_texture_webp` et textures embarquées ; le rendu Android local les lit via BitmapFactory, sans serveur de génération. Le personnage personnalisé importé reste en 2D. **Limite** : la géométrie reconstruite d'une seule photo ne possède pas tous les blendshapes nécessaires au lip-sync phonémique, et les profils sont approximatifs.

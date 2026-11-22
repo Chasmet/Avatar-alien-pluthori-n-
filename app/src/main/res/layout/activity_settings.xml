@@ -38,11 +38,15 @@
             android:textStyle="bold" android:textColor="#E6B5FF" android:textSize="20sp" />
         <Switch android:id="@+id/useModel3D" android:layout_width="match_parent"
             android:layout_height="56dp" android:checked="true"
-            android:text="Pluthorien Alpha — modèle GLB 3D"
+            android:text="Modèles 3D GLB — les cinq extraterrestres"
             android:textColor="#FFFFFF"/>
         <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:text="Le GLB est inclus hors ligne : tête et mâchoire articulées. Les autres personnages restent en 2D jusqu'à l'ajout de leurs modèles."
+            android:text="Cinq modèles GLB sont inclus dans l'application : Alpha, Sage, Gardien, Ombre et Annunaki. Le personnage personnalisé reste en portrait 2D."
             android:textColor="#C0B5D2" android:textSize="12sp"/>
+        <Switch android:id="@+id/originalAlphaModel" android:layout_width="match_parent"
+            android:layout_height="56dp" android:checked="false"
+            android:text="Alpha : utiliser le modèle 3D d'origine"
+            android:textColor="#FFFFFF"/>
         <Switch android:id="@+id/naturalModel" android:layout_width="match_parent"
             android:layout_height="58dp" android:checked="true"
             android:text="Rendu naturel : masquer les volumes gris"
