@@ -14,7 +14,7 @@ on:
       - ".github/workflows/preview.yml"
   workflow_dispatch:
 permissions:
-  contents: read
+  contents: write
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -64,3 +64,64 @@ jobs:
             app/build/outputs/apk/honor/debug/*.apk
             app/build/outputs/apk/compat/debug/*.apk
           if-no-files-found: error
+
+      - name: Publier les APK de prévisualisation et le canal MAJAUTO
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="app/build/outputs/apk/honor/debug/app-honor-debug.apk"
+          COMPAT="app/build/outputs/apk/compat/debug/app-compat-debug.apk"
+          test -s "$APK" && test -s "$COMPAT"
+          BADGING=$("$ANDROID_HOME/build-tools/34.0.0/aapt" dump badging "$APK" | head -n 1)
+          echo "$BADGING" | grep "package: name='fr.chk.alienlive.debug'"
+          VERSION=$(printf '%s\n' "$BADGING" | sed -n "s/.*versionName='\([^']*\)'.*/\1/p")
+          CODE=$(printf '%s\n' "$BADGING" | sed -n "s/.*versionCode='\([^']*\)'.*/\1/p")
+          test -n "$VERSION" && test -n "$CODE"
+          TAG="chk-pluthor-preview-$GITHUB_RUN_NUMBER"
+          SIGNER=$("$ANDROID_HOME/build-tools/34.0.0/apksigner" verify --print-certs "$APK" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | head -n 1)
+          test -n "$SIGNER"
+          # Si la clé debug change, refuser une mise à jour qui ne serait pas installable.
+          CURRENT=$(gh api "repos/$GITHUB_REPOSITORY/contents/update-preview.json" --jq .sha 2>/dev/null || true)
+          if [ -n "$CURRENT" ]; then
+            PREVIOUS_SIGNER=$(gh api "repos/$GITHUB_REPOSITORY/contents/update-preview.json" --jq .content | base64 -d | python3 -c 'import json,sys;print(json.load(sys.stdin).get("signerSha256",""))')
+            if [ -n "$PREVIOUS_SIGNER" ] && [ "$PREVIOUS_SIGNER" != "$SIGNER" ]; then
+              echo "::error::Debug signing certificate changed: a seamless preview update would be rejected."
+              exit 1
+            fi
+          fi
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$APK#CHK-Pluthor-Honor-Preview.apk" "$COMPAT#CHK-Pluthor-Android-Preview.apk" --clobber --repo "$GITHUB_REPOSITORY"
+          else
+            gh release create "$TAG" "$APK#CHK-Pluthor-Honor-Preview.apk" "$COMPAT#CHK-Pluthor-Android-Preview.apk" \
+              --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease \
+              --title "CHK Pluthor — Préversion $VERSION" \
+              --notes "5 aliens GLB articulés. Préversion Android signée, package fr.chk.alienlive.debug ; s'installe en parallèle sans supprimer les données de l'application stable. Son canal MAJAUTO est distinct du canal stable."
+          fi
+          export VERSION CODE TAG SIGNER
+          SHA=$(sha256sum "$APK" | cut -d ' ' -f 1)
+          export SHA
+          python3 - <<'PY'
+          import json,os
+          result={
+            "versionCode":int(os.environ["CODE"]),
+            "versionName":os.environ["VERSION"],
+            "packageName":"fr.chk.alienlive.debug",
+            "apkUrl":"https://github.com/Chasmet/Avatar-alien-pluthori-n-/releases/download/"+os.environ["TAG"]+"/CHK-Pluthor-Honor-Preview.apk",
+            "sha256":os.environ["SHA"],
+            "signerSha256":os.environ["SIGNER"]
+          }
+          with open("update-preview.json","w",encoding="utf-8") as output:
+              json.dump(result,output,indent=2,ensure_ascii=False)
+              output.write("\n")
+          PY
+          METADATA=$(base64 -w0 update-preview.json)
+          if [ -n "$CURRENT" ]; then
+            gh api --method PUT "repos/$GITHUB_REPOSITORY/contents/update-preview.json" \
+              -f message="MAJAUTO preview: v$VERSION" -f branch=main -f sha="$CURRENT" -f content="$METADATA" >/dev/null
+          else
+            gh api --method PUT "repos/$GITHUB_REPOSITORY/contents/update-preview.json" \
+              -f message="MAJAUTO preview: initial v$VERSION" -f branch=main -f content="$METADATA" >/dev/null
+          fi
