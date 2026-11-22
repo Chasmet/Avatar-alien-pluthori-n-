@@ -20,6 +20,7 @@ public final class AlienStageView extends View {
     private final PortraitAnimator portraitAnimator=new PortraitAnimator();
     private volatile float mouthOpen=0f, headYaw=0f, headPitch=0f, eyeLeft=0f, eyeRight=0f;
     private float targetMouth=0f;
+    private volatile float voiceMouth=0f;
     private volatile long lastFaceAt=0L;
     private boolean animateMouth=true, animateEyes=true, followHead=true;
     private float mouthSensitivity=1.7f;
@@ -81,6 +82,7 @@ public final class AlienStageView extends View {
         postInvalidateOnAnimation();
     }
     public float getMouthLevel(){return mouthOpen;}
+    public void setVoiceMouth(float value){voiceMouth=Math.max(0f,Math.min(1f,value));if(voiceMouth>0.01f)postInvalidateOnAnimation();}
     @Override protected void onDraw(Canvas c) {
         super.onDraw(c);
         float w=getWidth(),h=getHeight();
@@ -112,7 +114,7 @@ public final class AlienStageView extends View {
                     portrait.height()/characterBitmap.getHeight());
             // Le maillage transforme la texture originale plutot qu'un point noir dessine.
             portraitAnimator.draw(c,characterBitmap,AlienData.character(getContext()),
-                freshFace?mouthOpen:0f,turn,tilt,
+                Math.max(freshFace?mouthOpen:0f,voiceMouth*.70f),turn,tilt,
                 animateEyes&&freshFace?eyeLeft:0f,
                 animateEyes&&freshFace?eyeRight:0f,
                 animateMouth||animateEyes||followHead);
