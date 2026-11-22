@@ -21,8 +21,16 @@ jobs:
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/preview"
           gh run download "$SOURCE_RUN" --repo "$GITHUB_REPOSITORY" --name CHK-Alien-Live-Android-Debug --dir "$RUNNER_TEMP/preview"
-          test -s "$RUNNER_TEMP/preview/app-honor-debug.apk"
-          test -s "$RUNNER_TEMP/preview/app-compat-debug.apk"
+          # upload-artifact conserve les sous-dossiers honor/debug et compat/debug.
+          HONOR="$(find "$RUNNER_TEMP/preview" -type f -name 'app-honor-debug.apk' -print -quit)"
+          COMPAT="$(find "$RUNNER_TEMP/preview" -type f -name 'app-compat-debug.apk' -print -quit)"
+          test -n "$HONOR" && test -s "$HONOR"
+          test -n "$COMPAT" && test -s "$COMPAT"
+          if [ "$HONOR" != "$RUNNER_TEMP/preview/app-honor-debug.apk" ]; then cp "$HONOR" "$RUNNER_TEMP/preview/app-honor-debug.apk"; fi
+          if [ "$COMPAT" != "$RUNNER_TEMP/preview/app-compat-debug.apk" ]; then cp "$COMPAT" "$RUNNER_TEMP/preview/app-compat-debug.apk"; fi
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools'
       - name: Préparer le manifest MAJAUTO preview
         env:
           SOURCE_RUN: ${{ github.event.workflow_run.id }}
