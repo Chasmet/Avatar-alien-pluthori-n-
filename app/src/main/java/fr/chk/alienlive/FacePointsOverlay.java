@@ -11,7 +11,7 @@ import android.view.View;
  * Leur placement est indicatif en 2D, puis appliqué aux régions du vrai maillage.
  */
 public final class FacePointsOverlay extends View {
-    public interface Listener { void onMove(int point,float x,float y); }
+    public interface Listener { void onMove(int point,float x,float y); default void onRelease(){} }
     private final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);
     private FaceCalibration settings;
     private Listener listener;
@@ -75,7 +75,7 @@ public final class FacePointsOverlay extends View {
             return true;
         }
         if(e.getActionMasked()==MotionEvent.ACTION_UP||e.getActionMasked()==MotionEvent.ACTION_CANCEL){
-            if(dragging>=0){dragging=-1;performClick();invalidate();return true;}
+            if(dragging>=0){dragging=-1;listener.onRelease();performClick();invalidate();return true;}
         }
         return true;
     }
