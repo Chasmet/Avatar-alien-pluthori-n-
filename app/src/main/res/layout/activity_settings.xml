@@ -38,17 +38,21 @@
             android:textStyle="bold" android:textColor="#E6B5FF" android:textSize="20sp" />
         <Switch android:id="@+id/useModel3D" android:layout_width="match_parent"
             android:layout_height="56dp" android:checked="true"
-            android:text="Pluthorien Alpha — véritable modèle GLB 3D"
+            android:text="Pluthorien Alpha — modèle GLB 3D"
             android:textColor="#FFFFFF"/>
         <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
             android:text="Le GLB est inclus hors ligne : tête et mâchoire articulées. Les autres personnages restent en 2D jusqu'à l'ajout de leurs modèles."
             android:textColor="#C0B5D2" android:textSize="12sp"/>
+        <Switch android:id="@+id/naturalModel" android:layout_width="match_parent"
+            android:layout_height="58dp" android:checked="true"
+            android:text="Rendu naturel : masquer les volumes gris"
+            android:textColor="#FFFFFF"/>
         <Switch android:id="@+id/followHead" android:layout_width="match_parent" android:layout_height="56dp"
             android:text="Suivre les mouvements de tête" android:textColor="#FFFFFF" android:checked="true"/>
         <Switch android:id="@+id/animateEyes" android:layout_width="match_parent" android:layout_height="56dp"
             android:text="Clignements et expressions des yeux" android:textColor="#FFFFFF" android:checked="true"/>
         <Switch android:id="@+id/animateMouth" android:layout_width="match_parent" android:layout_height="56dp"
-            android:text="Synchronisation lèvres et bouche par caméra"
+            android:text="Animation des lèvres et de la mâchoire"
             android:textColor="#FFFFFF" android:checked="true"/>
         <TextView android:id="@+id/mouthSensitivityLabel" android:layout_width="match_parent"
             android:layout_height="wrap_content" android:text="Sensibilité de la bouche : 75 %"
@@ -60,7 +64,7 @@
             android:textColor="#BCAFD1" android:textSize="13sp"/>
         <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
             android:paddingTop="14dp"
-            android:text="La transformation de la voix est proposée dans le nouvel écran Voix. Elle diffuse l’effet sur la sortie audio du téléphone et ne remplace PAS automatiquement le microphone TikTok. Le visage est suivi par la caméra et le maillage du portrait reproduit la mâchoire, la bouche et les paupières. Le suivi des phonèmes précis reste impossible avec une simple photo 2D ; un personnage 3D riggé sera nécessaire."
+            android:text="La transformation vocale sort par les haut-parleurs du téléphone et ne remplace pas automatiquement le micro d’une autre application. Le visage est suivi par la caméra et le maillage du portrait reproduit la mâchoire, la bouche et les paupières. Le suivi des phonèmes précis reste impossible avec une simple photo 2D ; un personnage 3D riggé sera nécessaire."
             android:textColor="#C8BDD8" android:textSize="14sp" />
         <TextView android:id="@+id/version" android:layout_width="match_parent" android:layout_height="70dp"
             android:gravity="center_vertical" android:textColor="#B89ACF" android:textSize="14sp" />
