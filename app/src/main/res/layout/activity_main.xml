@@ -19,6 +19,8 @@
             android:padding="8dp" android:background="#231C40" />
         <Button android:id="@+id/buttonLive" android:layout_width="match_parent" android:layout_height="50dp"
             android:text="PLEIN ÉCRAN — LIVE" android:background="@drawable/btn_primary" android:textAllCaps="false" android:textColor="#FFFFFF" />
+        <Button android:id="@+id/buttonLipMic" android:layout_width="match_parent" android:layout_height="48dp"
+            android:text="Synchroniser les lèvres au micro • wLipSync" android:textAllCaps="false" android:textColor="#FFFFFF" />
         <Button android:id="@+id/buttonVoice" android:layout_width="match_parent" android:layout_height="50dp"
             android:text="Activer la voix extraterrestre — appui long : réglages" android:textAllCaps="false" android:textColor="#FFFFFF" />
         <LinearLayout android:layout_width="match_parent" android:layout_height="62dp" android:gravity="center" android:orientation="horizontal">

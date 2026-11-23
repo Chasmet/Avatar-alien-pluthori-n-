@@ -83,6 +83,10 @@ public final class Alien3DView extends GLSurfaceView {
     }
     private volatile float gazeX,gazeY;
     public void setGaze(float x,float y){gazeX=x;gazeY=y;}
+    private volatile float spokenRound,spokenWide;
+    public void setSpokenShape(float round,float wide){
+        spokenRound=round;spokenWide=wide;
+    }
     public void setSmile(float probability){smile=Math.max(0f,Math.min(1f,probability));}
     public void setReverseVertical(boolean enabled){reverseVertical=enabled;}
     public void setFaceCalibration(FaceCalibration cal){faceCalibration=cal;requestRender();}
@@ -182,7 +186,7 @@ public final class Alien3DView extends GLSurfaceView {
                 float cheek=uDetail.x*leftWeight+uDetail.y*rightWeight;
                 pos.y+=front*scale.y*(.025*cheek+.010*uSmile*lipMask);
                 pos.z+=front*scale.x*(.012*cheek+.026*uDetail.z*lipMask);
-                pos.x+=front*scale.x*lip.x*lipMask*(.18*uSmile-.43*uDetail.z);
+                pos.x+=front*scale.x*lip.x*lipMask*(.18*uSmile-.43*uDetail.z+.34*uDetail.w*(1.-uDetail.z));
                 vec2 dl=uv-uEyePoints.xy, dr=uv-uEyePoints.zw;
                 float le=region(dl,vec2(.095,.036)), re=region(dr,vec2(.095,.036));
                 pos.y-=front*uSurface.y*scale.y*(dl.y*le*uBlinkWeight.y+dr.y*re*uBlinkWeight.x)*1.55;
@@ -318,7 +322,7 @@ public final class Alien3DView extends GLSurfaceView {
             float basisH=imported?faceHeight:1.50f;
             GLES20.glUniform4f(faceLoc,imported?centerX:0f,imported?faceMinY:-.64f,basisW,basisH);
             GLES20.glUniform1f(frontZLoc,centerZ);
-            GLES20.glUniform4f(detailLoc,tracking?cheekLeft:0f,tracking?cheekRight:0f,tracking?rounded:0f,0f);
+            GLES20.glUniform4f(detailLoc,tracking?cheekLeft:0f,tracking?cheekRight:0f,Math.max(tracking?rounded:0f,spokenRound),spokenWide);
             float[] le=cal==null?new float[]{.375f,.705f}:cal.effectivePoint(0);
             float[] re=cal==null?new float[]{.625f,.705f}:cal.effectivePoint(1);
             float[] mo=cal==null?new float[]{.50f,.54f}:cal.effectivePoint(2);

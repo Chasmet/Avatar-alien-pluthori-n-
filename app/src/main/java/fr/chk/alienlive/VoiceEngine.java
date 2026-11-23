@@ -31,7 +31,13 @@ public final class VoiceEngine {
     public void setMix(float v){effectMix=Math.max(0f,Math.min(1f,v));}
     public float getLevel(){return level;}
 
-    private Thread worker;
+    private volatile Thread worker;
+    private volatile WLipSync lipSync;
+    private boolean playingBack;
+    WLipSync.Pose lipPose(){
+        WLipSync engine=lipSync;
+        return running&&engine!=null?engine.pose():WLipSync.Pose.REST;
+    }
     private AudioRecord input;
     private AudioTrack output;
     private final float[] history = new float[RING];
@@ -48,50 +54,66 @@ public final class VoiceEngine {
 
     /** Caller must have requested and received RECORD_AUDIO runtime permission. */
     @SuppressWarnings("MissingPermission")
-    public synchronized boolean start() {
-        if(running) return true;
+    public synchronized boolean start() { return start(true,false); }
+
+    @SuppressWarnings("MissingPermission")
+    synchronized boolean start(boolean playback,boolean analyzeLips) {
+        if(running && playingBack==playback && (lipSync!=null)==analyzeLips)return true;
+        if(worker!=null || input!=null)stop(false);
         try {
             int minIn = AudioRecord.getMinBufferSize(SAMPLE_RATE,AudioFormat.CHANNEL_IN_MONO,AudioFormat.ENCODING_PCM_16BIT);
             int minOut = AudioTrack.getMinBufferSize(SAMPLE_RATE,AudioFormat.CHANNEL_OUT_MONO,AudioFormat.ENCODING_PCM_16BIT);
-            if(minIn<=0 || minOut<=0) {state("Audio non pris en charge par ce téléphone");return false;}
+            if(minIn<=0 || (playback && minOut<=0)) {state("Audio non pris en charge par ce téléphone");return false;}
             input = new AudioRecord(MediaRecorder.AudioSource.MIC,SAMPLE_RATE,AudioFormat.CHANNEL_IN_MONO,
                     AudioFormat.ENCODING_PCM_16BIT, Math.max(8192,minIn*2));
             if(input.getState()!=AudioRecord.STATE_INITIALIZED){release();state("Microphone indisponible");return false;}
-            AudioAttributes.Builder a = new AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_MEDIA)
-                    .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH);
-            if(Build.VERSION.SDK_INT>=29) a.setAllowedCapturePolicy(AudioAttributes.ALLOW_CAPTURE_BY_ALL);
-            AudioFormat fmt = new AudioFormat.Builder().setSampleRate(SAMPLE_RATE)
-                    .setEncoding(AudioFormat.ENCODING_PCM_16BIT).setChannelMask(AudioFormat.CHANNEL_OUT_MONO).build();
-            output = new AudioTrack(a.build(),fmt,Math.max(8192,minOut*2),AudioTrack.MODE_STREAM,AudioManager.AUDIO_SESSION_ID_GENERATE);
-            if(output.getState()!=AudioTrack.STATE_INITIALIZED){release();state("Sortie audio indisponible");return false;}
+            if(playback){
+                AudioAttributes.Builder a = new AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_MEDIA)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH);
+                if(Build.VERSION.SDK_INT>=29) a.setAllowedCapturePolicy(AudioAttributes.ALLOW_CAPTURE_BY_ALL);
+                AudioFormat fmt = new AudioFormat.Builder().setSampleRate(SAMPLE_RATE)
+                        .setEncoding(AudioFormat.ENCODING_PCM_16BIT).setChannelMask(AudioFormat.CHANNEL_OUT_MONO).build();
+                output = new AudioTrack(a.build(),fmt,Math.max(8192,minOut*2),AudioTrack.MODE_STREAM,AudioManager.AUDIO_SESSION_ID_GENERATE);
+                if(output.getState()!=AudioTrack.STATE_INITIALIZED){release();state("Sortie audio indisponible");return false;}
+            }
             wrote=0;phase=0;echoAt=0;
             previousInput=0f;highPassed=0f;noiseEnvelope=0f;level=0f;
             java.util.Arrays.fill(history,0f);java.util.Arrays.fill(echoHistory,0f);
             input.startRecording();
-            output.play();
+            if(input.getRecordingState()!=AudioRecord.RECORDSTATE_RECORDING){
+                release();state("Microphone indisponible");return false;
+            }
+            if(playback)output.play();
+            playingBack=playback;
+            WLipSync analyzer=analyzeLips?new WLipSync(SAMPLE_RATE):null;
+            lipSync=analyzer;
+            AudioRecord recorder=input;
+            AudioTrack player=output;
             running=true;
-            worker = new Thread(this::loop,"CHK-Voice-FX");
+            worker = new Thread(()->loop(recorder,player,analyzer),"CHK-Voice-FX");
             worker.start();
-            state("Voix transformée dans CHK • sortie audio média");
+            state(playback?"Voix activée dans CHK":"wLipSync actif • micro seul");
             return true;
         } catch (SecurityException e) {release();state("Autorisation microphone refusée");return false;}
           catch (Exception e) {release();state("Audio non initialisé : "+e.getClass().getSimpleName());return false;}
     }
-    private void loop() {
+    private void loop(AudioRecord recorder,AudioTrack player,WLipSync analyzer) {
         Process.setThreadPriority(Process.THREAD_PRIORITY_AUDIO);
         final short[] in = new short[512];
         final short[] out = new short[512];
         long silentSamples=0;
-        while(running) {
+        while(running && worker==Thread.currentThread()) {
             int count;
-            try{ count=input.read(in,0,in.length); }
+            try{ count=recorder.read(in,0,in.length); }
             catch(Exception e){ if(running) state("Enregistrement interrompu");break; }
             if(count<=0){if(count<0)state("Le microphone a été interrompu");break;}
+            if(!running || worker!=Thread.currentThread())break;
+            if(analyzer!=null)analyzer.accept(in,count);
             float energy=0f;
             for(int i=0;i<count;i++){
                 energy+=((float)in[i]/32768f)*((float)in[i]/32768f);
-                out[i] = transform(in[i]);
+                if(player!=null)out[i] = transform(in[i]);
             }
             float measured=(float)Math.sqrt(energy/Math.max(1,count));
             level=level*(measured>level?.48f:.82f)+measured*(measured>level?.52f:.18f);
@@ -101,10 +123,11 @@ public final class VoiceEngine {
                 state("Aucun son du micro : vérifie si une autre application le monopolise");
                 silentSamples=0;
             }
-            try {int written=0;while(written<count&&running){int n=output.write(out,written,count-written);if(n<=0)break;written+=n;}}
+            if(player==null)continue;
+            try {int written=0;while(written<count&&running){int n=player.write(out,written,count-written);if(n<=0)break;written+=n;}}
             catch(Exception e){if(running)state("Lecture audio interrompue");break;}
         }
-        running=false;
+        if(worker==Thread.currentThread())running=false;
     }
     private float read(float delay) {
         float index = (float)wrote-delay;
@@ -155,14 +178,17 @@ public final class VoiceEngine {
         clipped=clipped/(1f+Math.abs(clipped)*.4f);
         return (short)(Math.max(-1,Math.min(1,clipped))*32767f);
     }
-    public synchronized void stop() {
+    public synchronized void stop() { stop(true); }
+    private void stop(boolean announce) {
         running=false;level=0f;
         if(input!=null){try{input.stop();}catch(Exception ignored){}}
+        if(output!=null){try{output.pause();output.flush();}catch(Exception ignored){}}
         Thread t=worker;
-        if(t!=null&&t!=Thread.currentThread()){try{t.join(250);}catch(InterruptedException e){Thread.currentThread().interrupt();}}
         worker=null;
+        if(t!=null&&t!=Thread.currentThread()){try{t.join(250);}catch(InterruptedException e){Thread.currentThread().interrupt();}}
+        lipSync=null;
         release();
-        state("Effet vocal arrêté");
+        if(announce)state("Microphone arrêté");
     }
     private void release() {
         if(input!=null){try{input.release();}catch(Exception ignored){} input=null;}

@@ -22,7 +22,8 @@ public final class MainActivity extends Activity {
     private String activeCustomGlbId="";
     private FaceTracker tracker;
     private VoiceEngine voice;
-    private Button voiceButton;
+    private Button voiceButton,lipMicButton;
+    private boolean lipOnlyRequested;
     private boolean voiceRequested=false;
     private View controls,header;
     private boolean animateLips=true;
@@ -38,13 +39,16 @@ public final class MainActivity extends Activity {
     private final android.os.Handler lipHandler=new android.os.Handler(android.os.Looper.getMainLooper());
     private final Runnable lipTicker=new Runnable(){
         @Override public void run(){
-            float audio=voice!=null&&voice.isRunning()?voice.getLevel():0f;
-            float audioMouth=Math.max(0f,Math.min(1f,(audio-.018f)*5.5f));
+            WLipSync.Pose spoken=voice.lipPose();
+            float audioMouth=spoken.open;
             FaceCalibration cal=activeCalibration;
             float voiceForGlb=cal==null?audioMouth:cal.mouth(audioMouth);
             stage.setVoiceMouth(animateLips?audioMouth:0f);
             boolean recent=android.os.SystemClock.uptimeMillis()-lastFaceMouthAt<450L;
             float mouth=recent?(mouthMeasured?trackedMouth:Math.max(trackedMouth,voiceForGlb*.55f)):voiceForGlb;
+            float detailGain=!animateLips?0f:recent&&mouthMeasured?Math.min(1f,trackedMouth*7f)*.55f:1f;
+            model3D.setSpokenShape(spoken.round*detailGain,spoken.wide*detailGain);
+            stage.setSpokenShape(spoken.round*detailGain,spoken.wide*detailGain);
             model3D.setPose(lastX,lastY,lastRoll,animateLips?mouth:0f);
             lipHandler.postDelayed(this,33L);
         }
@@ -76,10 +80,9 @@ public final class MainActivity extends Activity {
         voice=new VoiceEngine(message->runOnUiThread(()->{
             if(!isFinishing()) Toast.makeText(this,message,Toast.LENGTH_SHORT).show();
         }));
-        voiceButton.setOnClickListener(v->{
-            if(voiceRequested){voiceRequested=false;voice.stop();voiceButton.setText("Activer la voix extraterrestre — appui long : réglages");}
-            else {voiceRequested=true;startVoice();}
-        });
+        lipMicButton=findViewById(R.id.buttonLipMic);
+        lipMicButton.setOnClickListener(v->{lipOnlyRequested=!lipOnlyRequested;startVoice();});
+        voiceButton.setOnClickListener(v->{voiceRequested=!voiceRequested;startVoice();});
         voiceButton.setOnLongClickListener(v->{startActivity(new Intent(this,VoiceActivity.class));return true;});
         findViewById(R.id.buttonVoiceMenu).setOnClickListener(v->startActivity(new Intent(this,VoiceActivity.class)));
         findViewById(R.id.buttonSettings).setOnClickListener(v->startActivity(new Intent(this,SettingsActivity.class)));
@@ -105,7 +108,9 @@ public final class MainActivity extends Activity {
                     long now=android.os.SystemClock.uptimeMillis();
                     if(now-lastFaceDiagnostic>650L){
                         lastFaceDiagnostic=now;
-                        status.setText(engineName+" • lèvres : "+(int)(stage.getMouthLevel()*100)+" %");
+                        String shape=voice.lipPose().vowel;
+                        status.setText(engineName+" • lèvres "+(int)(stage.getMouthLevel()*100)+" %"+
+                            (shape.isEmpty()?"":" • wLipSync "+shape));
                     }
                 });
             }
@@ -196,15 +201,29 @@ public final class MainActivity extends Activity {
         model3D.setNaturalModel(selected!=0
                 &&AlienData.prefs(this).getBoolean("naturalModel",true));
     }
+    private void updateAudioButtons(){
+        voiceButton.setText(voiceRequested?"Arrêter la voix extraterrestre — appui long : réglages":
+            "Activer la voix extraterrestre — appui long : réglages");
+        lipMicButton.setEnabled(animateLips&&!voiceRequested);
+        lipMicButton.setText(!animateLips?"Animation des lèvres désactivée":
+            voiceRequested?"wLipSync actif avec la voix":lipOnlyRequested?
+            "Arrêter wLipSync • micro seul":"Synchroniser les lèvres au micro • wLipSync");
+    }
     private void startVoice(){
+        if(!voiceRequested&&!lipOnlyRequested){
+            if(voice.isRunning())voice.stop();
+            updateAudioButtons();return;
+        }
         if(Build.VERSION.SDK_INT>=23&&checkSelfPermission(Manifest.permission.RECORD_AUDIO)!=PackageManager.PERMISSION_GRANTED){
             requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO},101);return;
         }
         voice.setPreset(AlienData.prefs(this).getInt("voicePreset",0));
         voice.setDepth(AlienData.prefs(this).getInt("voiceDepth",75)/100f);
         voice.setMix(AlienData.prefs(this).getInt("voiceMix",85)/100f);
-        if(voice.start())voiceButton.setText("Arrêter la voix extraterrestre — appui long : réglages");
-        else voiceRequested=false;
+        if(!voice.start(voiceRequested,animateLips)){
+            lipOnlyRequested=false;voiceRequested=false;
+        }
+        updateAudioButtons();
     }
     private void openLibrary(boolean scenes){
         Intent intent=new Intent(this,LibraryActivity.class);
@@ -247,7 +266,9 @@ public final class MainActivity extends Activity {
         lipHandler.post(lipTicker);
         sync3DMode();
         tracker.setSaver(AlienData.prefs(this).getBoolean("saveBattery",false));
-        if(voiceRequested) startVoice();
+        if(!animateLips)lipOnlyRequested=false;
+        if(voiceRequested||lipOnlyRequested)startVoice();
+        else updateAudioButtons();
         if(Build.VERSION.SDK_INT>=23&&checkSelfPermission(Manifest.permission.CAMERA)!=PackageManager.PERMISSION_GRANTED){
             requestPermissions(new String[]{Manifest.permission.CAMERA},100);
         }else{tracker.start();}
@@ -264,8 +285,8 @@ public final class MainActivity extends Activity {
             if(results.length>0&&results[0]==PackageManager.PERMISSION_GRANTED)tracker.start();
             else status.setText("Autorise la caméra pour animer le personnage");
         }else if(request==101){
-            if(results.length>0&&results[0]==PackageManager.PERMISSION_GRANTED&&voiceRequested)startVoice();
-            else {voiceRequested=false;status.setText("Autorise le micro pour modifier la voix");}
+            if(results.length>0&&results[0]==PackageManager.PERMISSION_GRANTED&&(voiceRequested||lipOnlyRequested))startVoice();
+            else {voiceRequested=false;lipOnlyRequested=false;updateAudioButtons();status.setText("Autorise le micro pour la synchronisation vocale");}
         }
     }
     @Override protected void onPause(){lipHandler.removeCallbacks(lipTicker);tracker.stop();model3D.onPause();if(voice!=null)voice.stop();super.onPause();}

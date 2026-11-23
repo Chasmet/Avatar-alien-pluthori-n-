@@ -27,6 +27,10 @@ public final class AlienStageView extends View {
     }
     private float gazeX,gazeY;
     public void setGaze(float x,float y){gazeX=x;gazeY=y;}
+    private volatile float spokenRound,spokenWide;
+    public void setSpokenShape(float round,float wide){
+        if(round!=spokenRound||wide!=spokenWide){spokenRound=round;spokenWide=wide;postInvalidateOnAnimation();}
+    }
     public void setSmile(float value){smile=Math.max(0f,value);}
     private float targetMouth=0f;
     private volatile float voiceMouth=0f;
@@ -91,7 +95,10 @@ public final class AlienStageView extends View {
         postInvalidateOnAnimation();
     }
     public float getMouthLevel(){return mouthOpen;}
-    public void setVoiceMouth(float value){voiceMouth=Math.max(0f,Math.min(1f,value));if(voiceMouth>0.01f)postInvalidateOnAnimation();}
+    public void setVoiceMouth(float value){
+        float next=Math.max(0f,Math.min(1f,value));
+        if(next!=voiceMouth){voiceMouth=next;postInvalidateOnAnimation();}
+    }
     @Override protected void onDraw(Canvas c) {
         super.onDraw(c);
         float w=getWidth(),h=getHeight();
@@ -127,7 +134,7 @@ public final class AlienStageView extends View {
                 animateEyes&&freshFace?eyeLeft:0f,
                 animateEyes&&freshFace?eyeRight:0f,
                 animateMouth&&freshFace?cheekLeft:0f,animateMouth&&freshFace?cheekRight:0f,
-                animateMouth&&freshFace?rounded:0f,animateMouth&&freshFace?smile:0f,
+                Math.max(animateMouth&&freshFace?rounded:0f,spokenRound),spokenWide,animateMouth&&freshFace?smile:0f,
                 animateEyes&&freshFace?gazeX:0f,animateEyes&&freshFace?gazeY:0f,
                 animateMouth||animateEyes||followHead);
             c.restore();
