@@ -25,6 +25,8 @@ public final class AlienStageView extends View {
         mouthMeasured=lipContours;
         cheekLeft=left;cheekRight=right;rounded=pucker;
     }
+    private float gazeX,gazeY;
+    public void setGaze(float x,float y){gazeX=x;gazeY=y;}
     public void setSmile(float value){smile=Math.max(0f,value);}
     private float targetMouth=0f;
     private volatile float voiceMouth=0f;
@@ -126,6 +128,7 @@ public final class AlienStageView extends View {
                 animateEyes&&freshFace?eyeRight:0f,
                 animateMouth&&freshFace?cheekLeft:0f,animateMouth&&freshFace?cheekRight:0f,
                 animateMouth&&freshFace?rounded:0f,animateMouth&&freshFace?smile:0f,
+                animateEyes&&freshFace?gazeX:0f,animateEyes&&freshFace?gazeY:0f,
                 animateMouth||animateEyes||followHead);
             c.restore();
         }

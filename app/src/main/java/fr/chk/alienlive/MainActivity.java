@@ -29,6 +29,7 @@ public final class MainActivity extends Activity {
     private volatile FaceCalibration activeCalibration;
     private boolean full=false;
     private TextView status,faceDiagnostics;
+    private String engineName="Suivi facial";
     private float lastPitchDegrees=0f,eyeLeftOpen=-1f,eyeRightOpen=-1f,smileConfidence=-1f;
     private long lastFaceDiagnostic=0L;
     private boolean mouthMeasured;
@@ -91,6 +92,8 @@ public final class MainActivity extends Activity {
             return false;
         });
         tracker=new FaceTracker(this,new FaceTracker.Listener(){
+            @Override public void onEngine(String name){engineName=name;status.setText("Suivi facial • "+name);}
+            @Override public void onGaze(float x,float y){model3D.setGaze(x,y);stage.setGaze(x,y);}
             @Override public void onPose(float x,float y,float roll,float mouth){
                 runOnUiThread(()->{
                     stage.updatePose(x,y,roll,mouth);
@@ -102,7 +105,7 @@ public final class MainActivity extends Activity {
                     long now=android.os.SystemClock.uptimeMillis();
                     if(now-lastFaceDiagnostic>650L){
                         lastFaceDiagnostic=now;
-                        status.setText("Suivi facial actif • lèvres : "+(int)(stage.getMouthLevel()*100)+" %");
+                        status.setText(engineName+" • lèvres : "+(int)(stage.getMouthLevel()*100)+" %");
                     }
                 });
             }

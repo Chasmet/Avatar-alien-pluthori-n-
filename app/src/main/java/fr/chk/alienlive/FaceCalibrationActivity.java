@@ -143,6 +143,8 @@ public final class FaceCalibrationActivity extends Activity {
             finish();
         });
         tracker=new FaceTracker(this,new FaceTracker.Listener(){
+            @Override public void onEngine(String name){faceStatus="Suivi facial • "+name;renderDiagnostics();}
+            @Override public void onGaze(float x,float y){glb.setGaze(x,y);}
             @Override public void onPose(float x,float y,float roll,float mouth){
                 detectedMouth=mouth;faceX=x;faceY=y;faceRoll=roll;
                 glb.setPose(focused&&freezeMotion?.5f:x,focused&&freezeMotion?.5f:y,

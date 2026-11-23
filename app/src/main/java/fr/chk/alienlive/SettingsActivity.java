@@ -11,6 +11,9 @@ import android.widget.TextView;
 public final class SettingsActivity extends Activity {
     @Override protected void onCreate(Bundle state){
         super.onCreate(state);setContentView(R.layout.activity_settings);
+        if("honor".equals(BuildConfig.FLAVOR) && android.os.Build.VERSION.SDK_INT>=24)
+            setup(R.id.mediaPipeFace,"mediaPipeFace",true);
+        else findViewById(R.id.mediaPipeFace).setVisibility(android.view.View.GONE);
         setup(R.id.autoUpdate,"autoUpdate",true);
         setup(R.id.batterySaver,"saveBattery",false);
         setup(R.id.followHead,"followHead",true);

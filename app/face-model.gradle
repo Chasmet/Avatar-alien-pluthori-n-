@@ -1,0 +1,35 @@
+def modelDir = layout.buildDirectory.dir('generated/face-landmarker/assets')
+def model = modelDir.map { it.file('face_landmarker.task') }
+def sourceUrl = 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task'
+def expectedHash = '64184e229b263107bc2b804c6625db1341ff2bb731874b0bcc2fe6544e0bc9ff'
+def sha256 = { file ->
+    java.security.MessageDigest.getInstance('SHA-256').digest(file.bytes).encodeHex().toString()
+}
+def prepareFaceModel = tasks.register('prepareFaceModel') {
+    inputs.property('url', sourceUrl)
+    inputs.property('sha256', expectedHash)
+    outputs.file(model)
+    doLast {
+        def dest = model.get().asFile
+        if (dest.isFile() && sha256(dest) == expectedHash) return
+        dest.parentFile.mkdirs()
+        def tmp = File.createTempFile('face_landmarker-', '.tmp', dest.parentFile)
+        try {
+            def connection = new URL(sourceUrl).openConnection()
+            connection.connectTimeout = 15000
+            connection.readTimeout = 60000
+            connection.inputStream.withCloseable { input ->
+                tmp.withOutputStream { output -> output << input }
+            }
+            if (sha256(tmp) != expectedHash) throw new GradleException('Modèle facial Google incomplet')
+            java.nio.file.Files.move(tmp.toPath(), dest.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+        } finally {
+            tmp.delete()
+        }
+    }
+}
+android.sourceSets.honor.assets.srcDir(modelDir)
+android.androidResources.noCompress += 'task'
+tasks.matching { it.name.startsWith('mergeHonor') && it.name.endsWith('Assets') }.configureEach {
+    dependsOn prepareFaceModel
+}

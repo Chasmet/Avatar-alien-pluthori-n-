@@ -6,6 +6,7 @@ android {
 
     defaultConfig {
         applicationId 'fr.chk.alienlive'
+        testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
         minSdk 21
         targetSdk 34
         versionCode = 20000 + Integer.parseInt(System.getenv('GITHUB_RUN_NUMBER') ?: '1')
@@ -55,8 +56,11 @@ android {
 }
 
 dependencies {
+    androidTestImplementation 'androidx.test:runner:1.5.2'
+    androidTestImplementation 'androidx.test.ext:junit:1.1.5'
     implementation 'androidx.core:core:1.13.1'
     honorImplementation 'com.google.mlkit:face-detection:16.1.7'
+    honorImplementation 'com.google.mediapipe:tasks-vision:0.10.29'
 }
 
 configurations.configureEach {
@@ -64,3 +68,6 @@ configurations.configureEach {
             'org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.22',
             'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.22'
 }
+
+// Model assets are downloaded once at build time; camera tracking works offline.
+apply from: 'face-model.gradle'

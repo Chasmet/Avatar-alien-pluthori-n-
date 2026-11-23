@@ -27,15 +27,20 @@ import com.google.mlkit.vision.face.Face;
 import com.google.mlkit.vision.face.FaceContour;
 import com.google.mlkit.vision.face.FaceDetection;
 import com.google.mlkit.vision.face.FaceDetectorOptions;
-import java.util.Arrays;
+import android.os.Build;
+import android.os.Looper;
+import android.util.Log;
+import com.google.android.gms.tasks.Tasks;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicBoolean;
 
-/** Analyse faciale hors ligne ML Kit (mode Honor). Aucun upload, aucune API web. */
+
+/** Suivi facial local pour le live et la calibration sur smartphone. */
 public final class FaceTracker {
     public interface Listener {
         void onPose(float x,float y,float roll,float mouth);
         void onStatus(String status);
+        default void onGaze(float x,float y){}
+        default void onEngine(String name){}
         default void onExpression(float yaw,float pitch,float blinkLeft,float blinkRight){}
         default void onCheeksAndLips(float left,float right,float rounded,boolean lipContours){}
         default void onFacialMeasurements(float leftEyeOpen,float rightEyeOpen,float mouth,float smile){}
@@ -44,8 +49,8 @@ public final class FaceTracker {
     private final Listener listener;
     private final TextureView preview;
     private Surface previewSurface;
-    private final com.google.mlkit.vision.face.FaceDetector detector;
-    private final AtomicBoolean busy = new AtomicBoolean();
+    private final Handler ui = new Handler(Looper.getMainLooper());
+    private Pipeline pipeline;
     private CameraDevice camera;
     private CameraCaptureSession session;
     private ImageReader reader;
@@ -53,24 +58,115 @@ public final class FaceTracker {
     private Handler cameraHandler;
     private int rotation=90;
     private volatile int intervalMs=50;
-    private final ContourExpressions contours = new ContourExpressions();
+
     private volatile int generation;
-    private long lastStatusAt=0;
+
     private volatile boolean stopped=true;
-    private long lastFrame=0, lastFound=0;
-    private volatile boolean announced=false;
+    private long lastFrame;
+
 
     public FaceTracker(Context ctx,Listener callback){this(ctx,callback,null);}
     public FaceTracker(Context ctx,Listener callback,TextureView previewView) {
         context=ctx; listener=callback;preview=previewView;
-        FaceDetectorOptions opts=new FaceDetectorOptions.Builder()
-            .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_FAST)
-            .setContourMode(FaceDetectorOptions.CONTOUR_MODE_ALL)
-            .setLandmarkMode(FaceDetectorOptions.LANDMARK_MODE_ALL)
-            .setClassificationMode(FaceDetectorOptions.CLASSIFICATION_MODE_ALL)
-            .setMinFaceSize(0.14f)
-            .build();
-        detector=FaceDetection.getClient(opts);
+    }
+    // Owned by one camera handler, including initialization, inference and release.
+    private final class Pipeline {
+        final int id;
+        final ContourExpressions contours=new ContourExpressions();
+        com.google.mlkit.vision.face.FaceDetector fallback;
+        MediaPipeTracker mobile;
+        boolean preferMobile, announced;
+        long lastFound;
+        Pipeline(int id){
+            this.id=id;
+            preferMobile=Build.VERSION.SDK_INT>=24 && AlienData.prefs(context).getBoolean("mediaPipeFace",true);
+        }
+        void publish(Runnable update){
+            ui.post(()->{if(!stopped && generation==id)update.run();});
+        }
+        void process(Image img,long now) throws Exception {
+            if(preferMobile){
+                try{
+                    if(mobile==null){
+                        mobile=new MediaPipeTracker(context);
+                        publish(()->listener.onEngine("MediaPipe"));
+                    }
+                    MediaPipeTracker.Frame f=mobile.detect(img,rotation,now);
+                    if(f==null){missing(now);return;}
+                    publish(()->{
+                        listener.onExpression(clampAngle(f.yaw,36f),clampAngle(f.pitch,28f),f.blinkLeft,f.blinkRight);
+                        listener.onGaze(f.gazeX,f.gazeY);
+                        listener.onPose(clamp(f.x),clamp(f.y),f.roll,f.mouth);
+                        listener.onCheeksAndLips(f.cheekLeft,f.cheekRight,f.rounded,true);
+                        listener.onFacialMeasurements(1f-f.blinkLeft,1f-f.blinkRight,f.mouth,f.smile);
+                    });
+                    found(now,"MediaPipe");
+                    return;
+                }catch(RuntimeException | LinkageError error){
+                    Log.w("CHK-Face","MediaPipe indisponible, passage au suivi local ML Kit",error);
+                    preferMobile=false;
+                    if(mobile!=null){mobile.close();mobile=null;}
+                    publish(()->listener.onGaze(0f,0f));
+                    announced=false;
+                }
+            }
+            if(fallback==null){
+                FaceDetectorOptions opts=new FaceDetectorOptions.Builder()
+                    .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_FAST)
+                    .setContourMode(FaceDetectorOptions.CONTOUR_MODE_ALL)
+                    .setLandmarkMode(FaceDetectorOptions.LANDMARK_MODE_ALL)
+                    .setClassificationMode(FaceDetectorOptions.CLASSIFICATION_MODE_ALL)
+                    .setMinFaceSize(.14f).build();
+                fallback=FaceDetection.getClient(opts);
+                publish(()->listener.onEngine("ML Kit"));
+            }
+            List<Face> faces=Tasks.await(fallback.process(InputImage.fromMediaImage(img,rotation)));
+            if(faces.isEmpty()){missing(now);return;}
+            Face f=faces.get(0);
+            Rect bounds=f.getBoundingBox();
+            boolean rotate=rotation==90||rotation==270;
+            float px=clamp(1f-bounds.exactCenterX()/(rotate?img.getHeight():img.getWidth()));
+            float py=clamp(bounds.exactCenterY()/(rotate?img.getWidth():img.getHeight()));
+            float yaw=f.getHeadEulerAngleY(),pitch=f.getHeadEulerAngleX(),roll=-f.getHeadEulerAngleZ();
+            Float probability=f.getSmilingProbability();
+            float smile=probability==null?-1f:clamp(probability);
+            contours.update(points(f,FaceContour.LEFT_EYE),points(f,FaceContour.RIGHT_EYE),
+                points(f,FaceContour.UPPER_LIP_BOTTOM),points(f,FaceContour.LOWER_LIP_TOP),
+                points(f,FaceContour.LEFT_CHEEK),points(f,FaceContour.RIGHT_CHEEK),points(f,FaceContour.NOSE_BOTTOM),
+                f.getLeftEyeOpenProbability(),f.getRightEyeOpenProbability(),yaw,pitch,smile,now);
+            float l=contours.eyeLeft,r=contours.eyeRight,mouth=contours.mouth;
+            float cl=contours.cheekLeft,cr=contours.cheekRight,round=contours.rounded;
+            boolean lips=contours.lipContours;
+            publish(()->{
+                listener.onExpression(clampAngle(yaw,36f),clampAngle(pitch,28f),eyeClosed(l),eyeClosed(r));
+                listener.onPose(px,py,roll,mouth);
+                listener.onCheeksAndLips(cl,cr,round,lips);
+                listener.onFacialMeasurements(l,r,mouth,smile);
+            });
+            found(now,"ML Kit");
+        }
+        void found(long now,String engine){
+            lastFound=now;
+            if(!announced){
+                announced=true;
+                publish(()->listener.onStatus("Visage suivi • "+engine));
+            }
+        }
+        void missing(long now){
+            if(announced && now-lastFound>450L){
+                announced=false;
+                contours.reset();
+                publish(()->{
+                    listener.onCheeksAndLips(0f,0f,0f,false);
+                    listener.onGaze(0f,0f);
+                    listener.onStatus("Visage non détecté : regarde la caméra");
+                });
+            }
+        }
+        void close(){
+            if(mobile!=null)mobile.close();
+            if(fallback!=null)fallback.close();
+        }
     }
     public void setSaver(boolean saver) {intervalMs=saver?120:50;}
     @SuppressLint("MissingPermission")
@@ -78,7 +174,9 @@ public final class FaceTracker {
         if(!stopped)return;
         stopped=false;
         final int activeGeneration=++generation;
-        cameraThread=new HandlerThread("chk-face-mlkit");
+        final Pipeline tracking=new Pipeline(activeGeneration);
+        pipeline=tracking;
+        cameraThread=new HandlerThread("chk-face-camera");
         cameraThread.start();
         cameraHandler=new Handler(cameraThread.getLooper());
         try{
@@ -114,62 +212,20 @@ public final class FaceTracker {
             if(front==null){listener.onStatus("Caméra avant absente");stop();return;}
             reader=ImageReader.newInstance(size.getWidth(),size.getHeight(),ImageFormat.YUV_420_888,3);
             reader.setOnImageAvailableListener(r->{
-                Image img=null;
-                try{
-                    img=r.acquireLatestImage();
+                if(stopped || generation!=activeGeneration)return;
+                try(Image img=r.acquireLatestImage()){
                     if(img==null)return;
                     long now=SystemClock.uptimeMillis();
-                    if(stopped || now-lastFrame<intervalMs || !busy.compareAndSet(false,true)){
-                        img.close();return;
-                    }
+                    if(now-lastFrame<intervalMs)return;
                     lastFrame=now;
-                    final Image pending=img;
-                    final int orientedWidth=rotation==90||rotation==270?img.getHeight():img.getWidth();
-                    final int orientedHeight=rotation==90||rotation==270?img.getWidth():img.getHeight();
-                    InputImage input=InputImage.fromMediaImage(img,rotation);
-                    detector.process(input).addOnSuccessListener(faces->{
-                        if(stopped || activeGeneration!=generation)return;
-                        if(!faces.isEmpty()){
-                            Face f=faces.get(0);
-                            Rect bounds=f.getBoundingBox();
-                            float yaw=f.getHeadEulerAngleY();
-                            float pitch=f.getHeadEulerAngleX();
-                            // Le yaw/pitch est appliqué séparément à la tête 3D ;
-                            // ne pas le réinjecter comme déplacement de l'image.
-                            float px=clamp(1f-bounds.exactCenterX()/orientedWidth);
-                            float py=clamp(bounds.exactCenterY()/orientedHeight);
-                            float roll=-f.getHeadEulerAngleZ();
-                            Float smile=f.getSmilingProbability();
-                            contours.update(points(f,FaceContour.LEFT_EYE),points(f,FaceContour.RIGHT_EYE),
-                                points(f,FaceContour.UPPER_LIP_BOTTOM),points(f,FaceContour.LOWER_LIP_TOP),
-                                points(f,FaceContour.LEFT_CHEEK),points(f,FaceContour.RIGHT_CHEEK),
-                                points(f,FaceContour.NOSE_BOTTOM),f.getLeftEyeOpenProbability(),
-                                f.getRightEyeOpenProbability(),yaw,pitch,smile==null?-1f:smile,now);
-                            float mouth=contours.mouth;
-                            listener.onExpression(clampAngle(yaw,36f),clampAngle(pitch,28f),
-                                eyeClosed(contours.eyeLeft),eyeClosed(contours.eyeRight));
-                            lastFound=now;
-                            listener.onPose(px,py,roll,mouth);
-                            listener.onCheeksAndLips(contours.cheekLeft,contours.cheekRight,contours.rounded,contours.lipContours);
-                            listener.onFacialMeasurements(contours.eyeLeft,contours.eyeRight,mouth,
-                                smile==null?-1f:clamp(smile));
-                            if(!announced){announced=true;listener.onStatus("Visage suivi • lèvres et mouvements actifs");}
-                        }else if(now-lastFound>450L&&announced){
-                            announced=false;
-                            contours.reset();
-                            listener.onCheeksAndLips(0f,0f,0f,false);
-                            listener.onStatus("Visage non détecté : regarde la caméra");
-                        }
-                    }).addOnFailureListener(e->listener.onStatus("Suivi facial : "+e.getClass().getSimpleName()))
-                      .addOnCompleteListener(t->{pending.close();if(activeGeneration==generation)busy.set(false);});
+                    tracking.process(img,now);
                 }catch(Exception e){
-                    if(img!=null)img.close();
-                    busy.set(false);
-                    listener.onStatus("Image caméra indisponible");
+                    Log.w("CHK-Face","Image caméra indisponible",e);
+                    tracking.missing(SystemClock.uptimeMillis());
                 }
             },cameraHandler);
             mgr.openCamera(front,new CameraDevice.StateCallback(){
-                @Override public void onOpened(CameraDevice c){if(stopped){c.close();return;}camera=c;configure();}
+                @Override public void onOpened(CameraDevice c){if(stopped||activeGeneration!=generation){c.close();return;}camera=c;configure();}
                 @Override public void onDisconnected(CameraDevice c){c.close();listener.onStatus("Caméra déconnectée");}
                 @Override public void onError(CameraDevice c,int code){c.close();listener.onStatus("Erreur caméra : "+code);}
             },cameraHandler);
@@ -225,13 +281,17 @@ public final class FaceTracker {
         session=null;
         try{if(camera!=null)camera.close();}catch(Exception ignore){}
         camera=null;
-        try{if(reader!=null)reader.close();}catch(Exception ignore){}
+        ImageReader previousReader=reader;
+        Pipeline previousPipeline=pipeline;
+        if(cameraHandler!=null)cameraHandler.post(()->{
+            try{if(previousPipeline!=null)previousPipeline.close();}
+            finally{if(previousReader!=null)previousReader.close();}
+        });
+        pipeline=null;
         try{if(previewSurface!=null)previewSurface.release();}catch(Exception ignore){}
         previewSurface=null;
         reader=null;
         if(cameraThread!=null){cameraThread.quitSafely();cameraThread=null;cameraHandler=null;}
-        busy.set(false);
-        announced=false;
-        contours.reset();
+
     }
 }

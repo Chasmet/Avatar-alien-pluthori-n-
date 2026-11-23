@@ -84,6 +84,19 @@ jobs:
         run: bash ./gradlew --no-daemon --stacktrace assembleHonorDebug assembleHonorRelease
       - name: Build compatibilite Android 21
         run: bash ./gradlew --no-daemon --stacktrace assembleCompatDebug
+      - name: Activer KVM pour le test facial Android
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Tester le vrai modèle MediaPipe sur Android
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 30
+          arch: x86_64
+          target: default
+          disable-animations: true
+          script: bash ./gradlew --no-daemon connectedHonorDebugAndroidTest
       - name: Vérifier les APK préversion avant publication MAJAUTO
         shell: bash
         run: |
@@ -164,7 +177,7 @@ jobs:
           # Métadonnées vérifiables même si l'API GitHub omet l'attribut digest.
           SHA_HONOR=$(sha256sum "$APK" | cut -d' ' -f1)
           SHA_COMPAT=$(sha256sum "$COMPAT" | cut -d' ' -f1)
-          NOTES=$(printf 'CHK Pluthor %s : lèvres synchronisées caméra/microphone, voix 44,1 kHz, cinq GLB accessibles, rendu original préservé.\nSignataire SHA-256 : %s\nsha256-honor=%s\nsha256-compat=%s\n' "$VERSION" "$SIGNER" "$SHA_HONOR" "$SHA_COMPAT")
+          NOTES=$(printf 'CHK Pluthor %s : suivi facial MediaPipe embarqué, lèvres, yeux, regard et joues en direct.\nSignataire SHA-256 : %s\nsha256-honor=%s\nsha256-compat=%s\n' "$VERSION" "$SIGNER" "$SHA_HONOR" "$SHA_COMPAT")
           # Signature figée par le cache. Une expiration bloque la compilation.
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release upload "$TAG" "$APK" "$COMPAT" --clobber --repo "$GITHUB_REPOSITORY"

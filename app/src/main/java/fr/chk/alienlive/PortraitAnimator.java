@@ -29,7 +29,7 @@ public final class PortraitAnimator {
     private static float gauss(float x,float sigma){float z=x/sigma;return (float)Math.exp(-z*z*1.55f);}
     public void draw(Canvas canvas,Bitmap bitmap,int character,float mouth,
                      float yaw,float pitch,float leftBlink,float rightBlink,float cheekL,float cheekR,
-                     float pucker,float smile,boolean enabled) {
+                     float pucker,float smile,float gazeX,float gazeY,boolean enabled) {
         if(bitmap==null||bitmap.isRecycled())return;
         int slot=Math.max(0,Math.min(MOUTH_X.length-1,character));
         if(!enabled){
@@ -65,6 +65,9 @@ public final class PortraitAnimator {
                 float rightEye=gauss(u-.635f,.078f);
                 float eyeBand=gauss(v-eyeY,.048f);
                 y+=eyeBand*(leftEye*right+rightEye*left)*.014f*(v<eyeY?1f:-1f);
+                float eyeMask=eyeBand*(leftEye*(1f-right)+rightEye*(1f-left));
+                x+=gazeX*.010f*eyeMask;
+                y-=gazeY*.007f*eyeMask;
                 // Perspective 2.5D subtile, impossible de remplacer une vraie tete 3D.
                 float face=gauss(v-.48f,.29f);
                 x+=headYaw*face*(.020f+(u-.5f)*.040f);

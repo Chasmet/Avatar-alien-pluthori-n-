@@ -55,6 +55,8 @@
             android:layout_height="58dp" android:checked="true"
             android:text="Masquer les volumes gris (GLB expérimentaux)"
             android:textColor="#FFFFFF"/>
+        <Switch android:id="@+id/mediaPipeFace" android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:minHeight="56dp" android:text="Suivi facial MediaPipe" android:textColor="#FFFFFF" />
         <Button android:id="@+id/openFaceCalibration"
             android:layout_width="match_parent" android:layout_height="58dp"
             android:text="Calibrer les yeux, la bouche et la tête (GLB)"

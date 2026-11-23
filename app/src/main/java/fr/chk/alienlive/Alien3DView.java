@@ -81,6 +81,8 @@ public final class Alien3DView extends GLSurfaceView {
         expressionTime=android.os.SystemClock.uptimeMillis();
         this.blinkLeft=leftBlink;this.blinkRight=rightBlink;
     }
+    private volatile float gazeX,gazeY;
+    public void setGaze(float x,float y){gazeX=x;gazeY=y;}
     public void setSmile(float probability){smile=Math.max(0f,Math.min(1f,probability));}
     public void setReverseVertical(boolean enabled){reverseVertical=enabled;}
     public void setFaceCalibration(FaceCalibration cal){faceCalibration=cal;requestRender();}
@@ -184,8 +186,8 @@ public final class Alien3DView extends GLSurfaceView {
                 vec2 dl=uv-uEyePoints.xy, dr=uv-uEyePoints.zw;
                 float le=region(dl,vec2(.095,.036)), re=region(dr,vec2(.095,.036));
                 pos.y-=front*uSurface.y*scale.y*(dl.y*le*uBlinkWeight.y+dr.y*re*uBlinkWeight.x)*1.55;
+                pos.xy+=front*uGaze*(le*(1.-uBlinkWeight.y)+re*(1.-uBlinkWeight.x))*scale*.012;
                 if(uImported>.5){
-                    pos.xy+=uGaze*(le+re)*scale*.0025;
                     pos.y+=uBreath*max(0.0,.35-uv.y)*scale.y*.012;
                     float neck=smoothstep(.39,.53,uv.y);
                     vec2 angle=uHeadMotion*neck;
@@ -324,8 +326,9 @@ public final class Alien3DView extends GLSurfaceView {
             float mouthOffset=imported?0f:-.31f;
             GLES20.glUniform4f(eyePointsLoc,le[0]-eyeOffset,le[1],re[0]+eyeOffset,re[1]);
             GLES20.glUniform2f(mouthPointLoc,mo[0],mo[1]+mouthOffset);
-            GLES20.glUniform2f(gazeLoc,eyesEnabled?((float)Math.sin(t*.67f)*(tracking?0f:.75f)+easedYaw*.15f)*(cal==null?1f:cal.gazeRange/55f):0f,
-                eyesEnabled?((float)Math.sin(t*.49f)*(tracking?0f:.42f)+easedPitch*.12f)*(cal==null?1f:cal.gazeRange/55f):0f);
+            float gazeGain=eyesEnabled?(cal==null?1f:cal.gazeRange/55f):0f;
+            GLES20.glUniform2f(gazeLoc,gazeGain*(tracking?gazeX:(float)Math.sin(t*.67f)*.15f),
+                gazeGain*(tracking?gazeY:(float)Math.sin(t*.49f)*.09f));
             GLES20.glUniform1f(breathLoc,breath);
             GLES20.glUniform2f(headMotionLoc,imported&&useHead
                 ?(-easedYaw*.40f+(float)Math.sin(t*.24f)*.018f):0f,
