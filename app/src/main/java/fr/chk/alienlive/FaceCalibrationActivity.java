@@ -156,6 +156,9 @@ public final class FaceCalibrationActivity extends Activity {
                 glb.setExpression(focused&&freezeMotion?0f:current.head(yaw),
                     focused&&freezeMotion?0f:current.head(pitch),a,b);
             }
+            @Override public void onCheeksAndLips(float left,float right,float pucker,boolean lipContours){
+                glb.setCheeksAndLips(left,right,pucker);
+            }
             @Override public void onFacialMeasurements(float left,float right,float mouth,float smile){
                 eyeLeftOpen=left;eyeRightOpen=right;
                 glb.setSmile(smile<0f?0f:FaceCalibration.clamp((smile-.25f)/.75f));

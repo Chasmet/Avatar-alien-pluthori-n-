@@ -19,6 +19,13 @@ public final class AlienStageView extends View {
     private Bitmap characterBitmap, sceneBitmap;
     private final PortraitAnimator portraitAnimator=new PortraitAnimator();
     private volatile float mouthOpen=0f, headYaw=0f, headPitch=0f, eyeLeft=0f, eyeRight=0f;
+    private boolean mouthMeasured;
+    private float cheekLeft,cheekRight,rounded,smile;
+    public void setCheeksAndLips(float left,float right,float pucker,boolean lipContours){
+        mouthMeasured=lipContours;
+        cheekLeft=left;cheekRight=right;rounded=pucker;
+    }
+    public void setSmile(float value){smile=Math.max(0f,value);}
     private float targetMouth=0f;
     private volatile float voiceMouth=0f;
     private volatile long lastFaceAt=0L;
@@ -92,7 +99,7 @@ public final class AlienStageView extends View {
         if(animate)atmosphere.renderBehind(c,w,h,selectedScene,selectedMode,intensity,headX,headY,saveBattery);
         if(characterBitmap!=null&&!show3D) {
             long time=SystemClock.uptimeMillis();
-            boolean freshFace=faceFound&&(time-lastFaceAt)<1700L;
+            boolean freshFace=faceFound&&(time-lastFaceAt)<450L;
             if(!freshFace)mouthOpen*=.80f;
             float breathing=(float)Math.sin(time*.00145f);
             float positionX=followHead&&freshFace?(headX-.5f):0f;
@@ -114,9 +121,11 @@ public final class AlienStageView extends View {
                     portrait.height()/characterBitmap.getHeight());
             // Le maillage transforme la texture originale plutot qu'un point noir dessine.
             portraitAnimator.draw(c,characterBitmap,AlienData.character(getContext()),
-                Math.max(freshFace?mouthOpen:0f,voiceMouth*.70f),turn,tilt,
+                animateMouth?(freshFace?(mouthMeasured?mouthOpen:Math.max(mouthOpen,voiceMouth*.70f)):voiceMouth):0f,turn,tilt,
                 animateEyes&&freshFace?eyeLeft:0f,
                 animateEyes&&freshFace?eyeRight:0f,
+                animateMouth&&freshFace?cheekLeft:0f,animateMouth&&freshFace?cheekRight:0f,
+                animateMouth&&freshFace?rounded:0f,animateMouth&&freshFace?smile:0f,
                 animateMouth||animateEyes||followHead);
             c.restore();
         }

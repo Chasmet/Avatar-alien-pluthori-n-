@@ -31,6 +31,7 @@ public final class MainActivity extends Activity {
     private TextView status,faceDiagnostics;
     private float lastPitchDegrees=0f,eyeLeftOpen=-1f,eyeRightOpen=-1f,smileConfidence=-1f;
     private long lastFaceDiagnostic=0L;
+    private boolean mouthMeasured;
     private float trackedMouth=0f,lastX=.5f,lastY=.5f,lastRoll=0f;
     private long lastFaceMouthAt=0L;
     private final android.os.Handler lipHandler=new android.os.Handler(android.os.Looper.getMainLooper());
@@ -42,7 +43,7 @@ public final class MainActivity extends Activity {
             float voiceForGlb=cal==null?audioMouth:cal.mouth(audioMouth);
             stage.setVoiceMouth(animateLips?audioMouth:0f);
             boolean recent=android.os.SystemClock.uptimeMillis()-lastFaceMouthAt<450L;
-            float mouth=recent?Math.max(trackedMouth,voiceForGlb*.55f):voiceForGlb;
+            float mouth=recent?(mouthMeasured?trackedMouth:Math.max(trackedMouth,voiceForGlb*.55f)):voiceForGlb;
             model3D.setPose(lastX,lastY,lastRoll,animateLips?mouth:0f);
             lipHandler.postDelayed(this,33L);
         }
@@ -117,10 +118,18 @@ public final class MainActivity extends Activity {
                         cal==null?pitch:cal.head(pitch),l,r);
                 });
             }
+            @Override public void onCheeksAndLips(float left,float right,float pucker,boolean lipContours){
+                runOnUiThread(()->{
+                    mouthMeasured=lipContours;
+                    stage.setCheeksAndLips(left,right,pucker,lipContours);
+                    model3D.setCheeksAndLips(animateLips?left:0f,animateLips?right:0f,animateLips?pucker:0f);
+                });
+            }
             @Override public void onFacialMeasurements(float leftOpen,float rightOpen,float mouth,float smile){
                 runOnUiThread(()->{
                     eyeLeftOpen=leftOpen;eyeRightOpen=rightOpen;smileConfidence=smile;
-                    model3D.setSmile(smile<0f?0f:Math.max(0f,(smile-.25f)/.75f));
+                    stage.setSmile(smile);
+                    model3D.setSmile(!animateLips||smile<0f?0f:Math.max(0f,(smile-.25f)/.75f));
                     if(faceDiagnostics.getVisibility()==View.VISIBLE){
                         String left=leftOpen<0f?"N/D":Math.round(leftOpen*100f)+"%";
                         String right=rightOpen<0f?"N/D":Math.round(rightOpen*100f)+"%";

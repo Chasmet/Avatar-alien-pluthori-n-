@@ -34,6 +34,11 @@ public final class Alien3DView extends GLSurfaceView {
     public interface Status { void onReady(); void onError(String message); }
     private final StageRenderer renderer;
     private volatile float yaw=0f,pitch=0f,roll=0f,mouth=0f,blinkLeft=0f,blinkRight=0f,smile=0f,x=.5f,y=.5f;
+    private volatile float cheekLeft, cheekRight, rounded;
+    private volatile long expressionTime;
+    public void setCheeksAndLips(float left,float right,float pucker){
+        cheekLeft=left; cheekRight=right; rounded=pucker;
+    }
     private volatile boolean reverseVertical=false;
     private volatile FaceCalibration faceCalibration=null;
     private volatile float calibrationZoom=1f,calibrationPanX=0f,calibrationPanY=0f;
@@ -73,6 +78,7 @@ public final class Alien3DView extends GLSurfaceView {
     }
     public void setExpression(float yaw,float pitch,float leftBlink,float rightBlink){
         this.yaw=yaw;this.pitch=pitch;
+        expressionTime=android.os.SystemClock.uptimeMillis();
         this.blinkLeft=leftBlink;this.blinkRight=rightBlink;
     }
     public void setSmile(float probability){smile=Math.max(0f,Math.min(1f,probability));}
@@ -140,7 +146,65 @@ public final class Alien3DView extends GLSurfaceView {
         private float faceMinY=0f,faceWidth=1f,faceHeight=1f;
         private volatile boolean loaded;
         private float easedYaw,easedPitch,easedRoll,easedJaw,easedBlinkL,easedBlinkR,easedSmile,easedX=.5f,easedY=.5f;
-        private final String VERTEX="attribute vec3 aPos;attribute vec2 aUv;attribute vec3 aMouthMorph;attribute vec3 aBlinkMorph;uniform mat4 uMvp;uniform float uLip;uniform float uMouthWeight;uniform vec2 uBlinkWeight;uniform float uSmile;uniform float uImported;uniform vec4 uFace;uniform vec2 uGaze;uniform float uBreath;uniform vec2 uHeadMotion;uniform vec4 uEyePoints;uniform vec2 uMouthPoint;varying vec2 vUv;varying float vLight;void main(){float side=smoothstep(-.025,.025,aPos.x-uFace.x);float eyeBlink=mix(uBlinkWeight.y,uBlinkWeight.x,side);vec3 pos=aPos+aMouthMorph*uMouthWeight+aBlinkMorph*eyeBlink;if(uImported>.5){float eX=(pos.x-uFace.x)/max(.01,uFace.z);float eY=(pos.y-uFace.y)/max(.01,uFace.w);float le=exp(-100.0*pow(eX-(uEyePoints.x-.5),2.0)-950.0*pow(eY-uEyePoints.y,2.0));float re=exp(-100.0*pow(eX-(uEyePoints.z-.5),2.0)-950.0*pow(eY-uEyePoints.w,2.0));pos.x+=uGaze.x*(le+re)*uFace.z*.0025;pos.y+=uGaze.y*(le+re)*uFace.w*.0025;pos.y+=uBreath*max(0.0,.35-eY)*uFace.w*.012;float lips=exp(-65.0*pow(eX-(uMouthPoint.x-.5),2.0)-850.0*pow(eY-uMouthPoint.y,2.0));pos.x+=sign(eX)*lips*uFace.z*uSmile*.007;float neck=smoothstep(.39,.53,eY);float ax=uHeadMotion.x*neck;float ay=uHeadMotion.y*neck;vec3 origin=vec3(uFace.x,uFace.y+.40*uFace.w,0.0);vec3 v=pos-origin;float c=cos(ax),sn=sin(ax);v=vec3(v.x*c+v.z*sn,v.y,-v.x*sn+v.z*c);c=cos(ay);sn=sin(ay);v=vec3(v.x,v.y*c-v.z*sn,v.y*sn+v.z*c);pos=origin+v;}else{float region=exp(-32.0*pos.x*pos.x-165.0*(pos.y+0.30)*(pos.y+0.30));pos.y+=uLip*0.022*region;pos.z+=uLip*0.009*region;}vUv=aUv;vLight=0.86+0.14*max(0.0,pos.z);gl_Position=uMvp*vec4(pos,1.0);}";
+        private int detailLoc, surfaceLoc, frontZLoc;
+        private final String VERTEX="""
+            attribute vec3 aPos;
+            attribute vec2 aUv;
+            attribute vec3 aMouthMorph;
+            attribute vec3 aBlinkMorph;
+            uniform mat4 uMvp;
+            uniform float uLip, uMouthWeight, uSmile, uImported, uBreath, uFrontZ;
+            uniform vec2 uBlinkWeight;
+            uniform vec2 uGaze, uHeadMotion, uMouthPoint;
+            uniform vec4 uFace, uEyePoints, uDetail, uSurface;
+            varying vec2 vUv;
+            varying float vLight;
+            float region(vec2 d,vec2 radius) {
+                vec2 t=d/radius;
+                return exp(-dot(t,t));
+            }
+            void main(){
+                vec2 scale=max(uFace.zw,vec2(.001));
+                vec2 uv=(aPos.xy-uFace.xy)/scale+vec2(.5,0.);
+                uv.y+=uSurface.z;
+                float side=smoothstep(-.025,.025,uv.x-.5);
+                float eyeBlink=mix(uBlinkWeight.y,uBlinkWeight.x,side);
+                vec3 pos=aPos+aMouthMorph*uMouthWeight+aBlinkMorph*eyeBlink;
+                vec2 lip=uv-uMouthPoint;
+                float lipMask=region(lip,vec2(.17,.060));
+                float front=uSurface.x;
+                if(uImported>.5)
+                    front*=smoothstep(uFrontZ-.02*scale.x,uFrontZ+.05*scale.x,aPos.z);
+                float leftWeight=region(uv-mix(uEyePoints.zw,uMouthPoint,.48)-vec2(.055,0.),vec2(.10,.080));
+                float rightWeight=region(uv-mix(uEyePoints.xy,uMouthPoint,.48)+vec2(.055,0.),vec2(.10,.080));
+                float cheek=uDetail.x*leftWeight+uDetail.y*rightWeight;
+                pos.y+=front*scale.y*(.025*cheek+.010*uSmile*lipMask);
+                pos.z+=front*scale.x*(.012*cheek+.026*uDetail.z*lipMask);
+                pos.x+=front*scale.x*lip.x*lipMask*(.18*uSmile-.43*uDetail.z);
+                vec2 dl=uv-uEyePoints.xy, dr=uv-uEyePoints.zw;
+                float le=region(dl,vec2(.095,.036)), re=region(dr,vec2(.095,.036));
+                pos.y-=front*uSurface.y*scale.y*(dl.y*le*uBlinkWeight.y+dr.y*re*uBlinkWeight.x)*1.55;
+                if(uImported>.5){
+                    pos.xy+=uGaze*(le+re)*scale*.0025;
+                    pos.y+=uBreath*max(0.0,.35-uv.y)*scale.y*.012;
+                    float neck=smoothstep(.39,.53,uv.y);
+                    vec2 angle=uHeadMotion*neck;
+                    vec3 origin=vec3(uFace.x,uFace.y+.40*scale.y,0.0);
+                    vec3 v=pos-origin;
+                    float c=cos(angle.x),sn=sin(angle.x);
+                    v=vec3(v.x*c+v.z*sn,v.y,-v.x*sn+v.z*c);
+                    c=cos(angle.y);sn=sin(angle.y);
+                    pos=origin+vec3(v.x,v.y*c-v.z*sn,v.y*sn+v.z*c);
+                }else{
+                    float upperLip=region(pos.xy-vec2(0.,-.30),vec2(.177,.078));
+                    pos.y+=uLip*.022*upperLip;
+                    pos.z+=uLip*.009*upperLip;
+                }
+                vUv=aUv;
+                vLight=.86+.14*max(0.,pos.z);
+                gl_Position=uMvp*vec4(pos,1.);
+            }
+            """;
         private final String FRAGMENT="precision mediump float;varying vec2 vUv;varying float vLight;uniform sampler2D uTexture;uniform vec4 uBase;uniform float uUseTexture;void main(){vec4 c=uBase;if(uUseTexture>0.5)c*=texture2D(uTexture,vUv);gl_FragColor=vec4(c.rgb*vLight,c.a);}";
         StageRenderer(Context ctx,Status status){context=ctx.getApplicationContext();callback=status;}
         @Override public void onSurfaceCreated(GL10 ignored,EGLConfig cfg){
@@ -167,6 +231,9 @@ public final class Alien3DView extends GLSurfaceView {
                 blinkMorphLoc=GLES20.glGetAttribLocation(program,"aBlinkMorph");
                 mouthMorphWeightLoc=GLES20.glGetUniformLocation(program,"uMouthWeight");
                 blinkMorphWeightLoc=GLES20.glGetUniformLocation(program,"uBlinkWeight");
+                detailLoc=GLES20.glGetUniformLocation(program,"uDetail");
+                surfaceLoc=GLES20.glGetUniformLocation(program,"uSurface");
+                frontZLoc=GLES20.glGetUniformLocation(program,"uFrontZ");
                 smileLoc=GLES20.glGetUniformLocation(program,"uSmile");
                 eyePointsLoc=GLES20.glGetUniformLocation(program,"uEyePoints");
                 mouthPointLoc=GLES20.glGetUniformLocation(program,"uMouthPoint");
@@ -209,10 +276,11 @@ public final class Alien3DView extends GLSurfaceView {
             easedRoll+=(roll-easedRoll)*blend;
             easedJaw+=(mouth-easedJaw)*(mouth>easedJaw?.66f:.46f);
             float t=android.os.SystemClock.uptimeMillis()*.001f;
-            float blinkPulse=(t%4.9f)>4.71f?(float)Math.sin(((t%4.9f)-4.71f)/.19f*3.1415927f):0f;
-            easedBlinkL+=((eyesEnabled?Math.max(blinkLeft,blinkPulse*.93f):0f)-easedBlinkL)*.52f;
-            easedBlinkR+=((eyesEnabled?Math.max(blinkRight,blinkPulse*.93f):0f)-easedBlinkR)*.52f;
-            easedSmile+=(smile-easedSmile)*.22f;
+            boolean tracking=android.os.SystemClock.uptimeMillis()-expressionTime<450L;
+            float blinkPulse=!tracking && (t%4.9f)>4.71f?(float)Math.sin(((t%4.9f)-4.71f)/.19f*3.1415927f):0f;
+            easedBlinkL+=((eyesEnabled?(tracking?blinkLeft:blinkPulse*.93f):0f)-easedBlinkL)*.52f;
+            easedBlinkR+=((eyesEnabled?(tracking?blinkRight:blinkPulse*.93f):0f)-easedBlinkR)*.52f;
+            easedSmile+=((tracking?smile:0f)-easedSmile)*.22f;
             easedX+=(x-easedX)*blend;
             easedY+=(y-easedY)*blend;
             Matrix.setLookAtM(view,0,0f,0f,3.7f,0f,-.13f,0f,0f,1f,0f);
@@ -229,7 +297,7 @@ public final class Alien3DView extends GLSurfaceView {
             boolean imported=activeCustomFile!=null;
             float breath=calibrationViewActive?0f:(float)Math.sin(t*1.7f);
             Matrix.translateM(root,0,(easedX-.5f)*.34f,(.5f-easedY)*.23f+(imported?breath*.008f:0f),0f);
-            if(imported&&!calibrationViewActive){
+            if(imported&&!calibrationViewActive&&!tracking){
                 Matrix.rotateM(root,0,(float)Math.sin(t*.38f)*1.65f,0f,0f,1f);
                 Matrix.rotateM(root,0,(float)Math.sin(t*.26f)*1.4f,0f,1f,0f);
             }
@@ -243,14 +311,21 @@ public final class Alien3DView extends GLSurfaceView {
             }
             GLES20.glUseProgram(program);
             GLES20.glUniform1f(importedLoc,imported?1f:0f);
-            GLES20.glUniform4f(faceLoc,centerX,faceMinY,faceWidth,faceHeight);
+            boolean classicAlpha="pluthorien_alpha.glb".equals(activeAsset);
+            float basisW=imported?faceWidth:classicAlpha?.90f:1.46f;
+            float basisH=imported?faceHeight:1.50f;
+            GLES20.glUniform4f(faceLoc,imported?centerX:0f,imported?faceMinY:-.64f,basisW,basisH);
+            GLES20.glUniform1f(frontZLoc,centerZ);
+            GLES20.glUniform4f(detailLoc,tracking?cheekLeft:0f,tracking?cheekRight:0f,tracking?rounded:0f,0f);
             float[] le=cal==null?new float[]{.375f,.705f}:cal.effectivePoint(0);
             float[] re=cal==null?new float[]{.625f,.705f}:cal.effectivePoint(1);
             float[] mo=cal==null?new float[]{.50f,.54f}:cal.effectivePoint(2);
-            GLES20.glUniform4f(eyePointsLoc,le[0],le[1],re[0],re[1]);
-            GLES20.glUniform2f(mouthPointLoc,mo[0],mo[1]);
-            GLES20.glUniform2f(gazeLoc,eyesEnabled?((float)Math.sin(t*.67f)*.75f+easedYaw*.15f)*(cal==null?1f:cal.gazeRange/55f):0f,
-                eyesEnabled?((float)Math.sin(t*.49f)*.42f+easedPitch*.12f)*(cal==null?1f:cal.gazeRange/55f):0f);
+            float eyeOffset=imported?0f:.055f;
+            float mouthOffset=imported?0f:-.31f;
+            GLES20.glUniform4f(eyePointsLoc,le[0]-eyeOffset,le[1],re[0]+eyeOffset,re[1]);
+            GLES20.glUniform2f(mouthPointLoc,mo[0],mo[1]+mouthOffset);
+            GLES20.glUniform2f(gazeLoc,eyesEnabled?((float)Math.sin(t*.67f)*(tracking?0f:.75f)+easedYaw*.15f)*(cal==null?1f:cal.gazeRange/55f):0f,
+                eyesEnabled?((float)Math.sin(t*.49f)*(tracking?0f:.42f)+easedPitch*.12f)*(cal==null?1f:cal.gazeRange/55f):0f);
             GLES20.glUniform1f(breathLoc,breath);
             GLES20.glUniform2f(headMotionLoc,imported&&useHead
                 ?(-easedYaw*.40f+(float)Math.sin(t*.24f)*.018f):0f,
@@ -289,9 +364,12 @@ public final class Alien3DView extends GLSurfaceView {
                 // Déformation locale de la lèvre haute sur les sommets texturés.
                 GLES20.glUniform1f(lipLoc,!imported&&!classic&&mesh.textured&&!mesh.jaw?easedJaw*.35f:0f);
                 GLES20.glUniform1f(mouthMorphWeightLoc,mesh.openMorph!=null?easedJaw:0f);
-                GLES20.glUniform2f(blinkMorphWeightLoc,mesh.blinkMorph!=null?easedBlinkL:0f,
-                    mesh.blinkMorph!=null?easedBlinkR:0f);
-                GLES20.glUniform1f(smileLoc,imported?easedSmile:0f);
+                GLES20.glUniform2f(blinkMorphWeightLoc,easedBlinkL,
+                    easedBlinkR);
+                boolean facialSurface=imported||mesh.textured;
+                GLES20.glUniform4f(surfaceLoc,facialSurface?1f:0f,mesh.blinkMorph==null?1f:0f,
+                    classic&&mesh.jaw?-.3166667f/basisH:0f,0f);
+                GLES20.glUniform1f(smileLoc,easedSmile);
                 if(mesh.openMorph!=null){
                     mesh.openMorph.position(0);
                     GLES20.glEnableVertexAttribArray(mouthMorphLoc);

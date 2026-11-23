@@ -47,7 +47,9 @@ final class GlbFaceAutoRig {
             float down=y<mouthY?-1f:.40f;
             lip[i+1]=mid*height*.012f*down;
             lip[i+2]=mid*depth*.008f;
-            blink[i+1]=-(l+r)*front*height*.009f;
+            float offsetLeft=y-(minY+height*left[1]);
+            float offsetRight=y-(minY+height*right[1]);
+            blink[i+1]=-(l*offsetLeft+r*offsetRight)*front*1.45f;
             blink[i+2]=-(l+r)*front*depth*.003f;
         }
         return new Face(lip,blink);

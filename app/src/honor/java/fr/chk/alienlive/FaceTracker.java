@@ -37,6 +37,7 @@ public final class FaceTracker {
         void onPose(float x,float y,float roll,float mouth);
         void onStatus(String status);
         default void onExpression(float yaw,float pitch,float blinkLeft,float blinkRight){}
+        default void onCheeksAndLips(float left,float right,float rounded,boolean lipContours){}
         default void onFacialMeasurements(float leftEyeOpen,float rightEyeOpen,float mouth,float smile){}
     }
     private final Context context;
@@ -51,9 +52,9 @@ public final class FaceTracker {
     private HandlerThread cameraThread;
     private Handler cameraHandler;
     private int rotation=90;
-    private int intervalMs=50;
-    private float gapNeutral=.008f;
-    private float openedSmooth=0f;
+    private volatile int intervalMs=50;
+    private final ContourExpressions contours = new ContourExpressions();
+    private volatile int generation;
     private long lastStatusAt=0;
     private volatile boolean stopped=true;
     private long lastFrame=0, lastFound=0;
@@ -76,6 +77,7 @@ public final class FaceTracker {
     public synchronized void start(){
         if(!stopped)return;
         stopped=false;
+        final int activeGeneration=++generation;
         cameraThread=new HandlerThread("chk-face-mlkit");
         cameraThread.start();
         cameraHandler=new Handler(cameraThread.getLooper());
@@ -126,7 +128,7 @@ public final class FaceTracker {
                     final int orientedHeight=rotation==90||rotation==270?img.getWidth():img.getHeight();
                     InputImage input=InputImage.fromMediaImage(img,rotation);
                     detector.process(input).addOnSuccessListener(faces->{
-                        if(stopped)return;
+                        if(stopped || activeGeneration!=generation)return;
                         if(!faces.isEmpty()){
                             Face f=faces.get(0);
                             Rect bounds=f.getBoundingBox();
@@ -137,25 +139,29 @@ public final class FaceTracker {
                             float px=clamp(1f-bounds.exactCenterX()/orientedWidth);
                             float py=clamp(bounds.exactCenterY()/orientedHeight);
                             float roll=-f.getHeadEulerAngleZ();
-                            float mouth=mouthOpen(f);
-                            float lx=eyeClosed(f.getLeftEyeOpenProbability());
-                            float rx=eyeClosed(f.getRightEyeOpenProbability());
-                            listener.onExpression(clampAngle(yaw,36f),clampAngle(pitch,28f),lx,rx);
-                            lastFound=SystemClock.uptimeMillis();
-                            listener.onPose(px,py,roll,mouth);
                             Float smile=f.getSmilingProbability();
-                            Float leftOpen=f.getLeftEyeOpenProbability();
-                            Float rightOpen=f.getRightEyeOpenProbability();
-                            listener.onFacialMeasurements(leftOpen==null?-1f:clamp(leftOpen),
-                                rightOpen==null?-1f:clamp(rightOpen),mouth,
+                            contours.update(points(f,FaceContour.LEFT_EYE),points(f,FaceContour.RIGHT_EYE),
+                                points(f,FaceContour.UPPER_LIP_BOTTOM),points(f,FaceContour.LOWER_LIP_TOP),
+                                points(f,FaceContour.LEFT_CHEEK),points(f,FaceContour.RIGHT_CHEEK),
+                                points(f,FaceContour.NOSE_BOTTOM),f.getLeftEyeOpenProbability(),
+                                f.getRightEyeOpenProbability(),yaw,pitch,smile==null?-1f:smile,now);
+                            float mouth=contours.mouth;
+                            listener.onExpression(clampAngle(yaw,36f),clampAngle(pitch,28f),
+                                eyeClosed(contours.eyeLeft),eyeClosed(contours.eyeRight));
+                            lastFound=now;
+                            listener.onPose(px,py,roll,mouth);
+                            listener.onCheeksAndLips(contours.cheekLeft,contours.cheekRight,contours.rounded,contours.lipContours);
+                            listener.onFacialMeasurements(contours.eyeLeft,contours.eyeRight,mouth,
                                 smile==null?-1f:clamp(smile));
                             if(!announced){announced=true;listener.onStatus("Visage suivi • lèvres et mouvements actifs");}
-                        }else if(now-lastFound>1600L&&announced){
+                        }else if(now-lastFound>450L&&announced){
                             announced=false;
+                            contours.reset();
+                            listener.onCheeksAndLips(0f,0f,0f,false);
                             listener.onStatus("Visage non détecté : regarde la caméra");
                         }
                     }).addOnFailureListener(e->listener.onStatus("Suivi facial : "+e.getClass().getSimpleName()))
-                      .addOnCompleteListener(t->{pending.close();busy.set(false);});
+                      .addOnCompleteListener(t->{pending.close();if(activeGeneration==generation)busy.set(false);});
                 }catch(Exception e){
                     if(img!=null)img.close();
                     busy.set(false);
@@ -209,40 +215,9 @@ public final class FaceTracker {
         if(probability==null||probability<0f)return 0f;
         return clamp((.85f-probability)*1.5f);
     }
-    private static float medianPointY(java.util.List<PointF> pts,float centerX,float tolerance){
-        float sum=0f,weights=0f,nearest=Float.MAX_VALUE,nearestY=0f;
-        for(PointF p:pts){
-            float distance=Math.abs(p.x-centerX);
-            if(distance<nearest){nearest=distance;nearestY=p.y;}
-            if(distance<tolerance){
-                float weight=1f-distance/tolerance;
-                sum+=p.y*weight;weights+=weight;
-            }
-        }
-        // Les contours ne présentent pas toujours un point exactement au centre.
-        return weights>0f?sum/weights:nearestY;
-    }
-    /** Ecart reel des levres par les contours ML Kit, normalise par largeur de visage.
-      * Le seuil neutre suit lentement l'ouverture minimale observee : evite qu'un
-      * sourire fige passe pour une conversation. */
-    private float mouthOpen(Face face){
-        FaceContour top=face.getContour(FaceContour.UPPER_LIP_BOTTOM);
-        FaceContour bottom=face.getContour(FaceContour.LOWER_LIP_TOP);
-        if(top==null||bottom==null)return 0f;
-        List<PointF> a=top.getPoints(),b=bottom.getPoints();
-        if(a.isEmpty()||b.isEmpty())return 0f;
-        float center=face.getBoundingBox().exactCenterX();
-        float width=Math.max(1f,face.getBoundingBox().width());
-        float tolerance=width*.09f;
-        float upperY=medianPointY(a,center,tolerance);
-        float lowerY=medianPointY(b,center,tolerance);
-        float gap=Math.max(0f,(lowerY-upperY)/width);
-        if(gap<gapNeutral)gapNeutral=gapNeutral*.80f+gap*.20f;
-        else gapNeutral=gapNeutral*.998f+gap*.002f;
-        float open=clamp((gap-gapNeutral-.0018f)*33.0f);
-        // Ouverture rapide et retour fluide au repos, même sur la voix parlée.
-        openedSmooth+=(open-openedSmooth)*(open>openedSmooth?.72f:.53f);
-        return openedSmooth;
+    private static List<PointF> points(Face face,int type){
+        FaceContour contour=face.getContour(type);
+        return contour==null?java.util.Collections.emptyList():contour.getPoints();
     }
     public synchronized void stop(){
         stopped=true;
@@ -257,6 +232,6 @@ public final class FaceTracker {
         if(cameraThread!=null){cameraThread.quitSafely();cameraThread=null;cameraHandler=null;}
         busy.set(false);
         announced=false;
-        gapNeutral=.008f;openedSmooth=0f;
+        contours.reset();
     }
 }

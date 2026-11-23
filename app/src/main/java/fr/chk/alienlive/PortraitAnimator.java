@@ -28,7 +28,8 @@ public final class PortraitAnimator {
     private static float clamp(float x){return Math.max(0f,Math.min(1f,x));}
     private static float gauss(float x,float sigma){float z=x/sigma;return (float)Math.exp(-z*z*1.55f);}
     public void draw(Canvas canvas,Bitmap bitmap,int character,float mouth,
-                     float yaw,float pitch,float leftBlink,float rightBlink,boolean enabled) {
+                     float yaw,float pitch,float leftBlink,float rightBlink,float cheekL,float cheekR,
+                     float pucker,float smile,boolean enabled) {
         if(bitmap==null||bitmap.isRecycled())return;
         int slot=Math.max(0,Math.min(MOUTH_X.length-1,character));
         if(!enabled){
@@ -54,11 +55,16 @@ public final class PortraitAnimator {
                 y+=m*horizontal*(.046f*below*around-.014f*above*around);
                 // Le menton accompagne le mouvement de machoire.
                 y+=m*horizontal*.015f*gauss(v-(my+.17f),.13f);
+                float cheekBand=gauss(v-(my+eyeY)*.5f,.064f);
+                float lift=cheekBand*(cheekR*gauss(u-(mx-.13f),.09f)+cheekL*gauss(u-(mx+.13f),.09f));
+                float lipBand=horizontal*gauss(v-my,.042f);
+                y-=.020f*lift+.007f*smile*lipBand;
+                x+=(u-mx)*lipBand*(.19f*smile-.42f*pucker);
                 // Contraction locale des paupieres avec souplesse.
                 float leftEye=gauss(u-.365f,.078f);
                 float rightEye=gauss(u-.635f,.078f);
                 float eyeBand=gauss(v-eyeY,.048f);
-                y+=eyeBand*(leftEye*left+rightEye*right)*.014f*(v<eyeY?1f:-1f);
+                y+=eyeBand*(leftEye*right+rightEye*left)*.014f*(v<eyeY?1f:-1f);
                 // Perspective 2.5D subtile, impossible de remplacer une vraie tete 3D.
                 float face=gauss(v-.48f,.29f);
                 x+=headYaw*face*(.020f+(u-.5f)*.040f);
@@ -72,7 +78,7 @@ public final class PortraitAnimator {
         // Les levres restent issues de la texture de l'avatar, non d'un dessin opaque.
         if(m>.10f){
             float x=mx*w, y=(my+.003f)*h;
-            float rx=w*(.055f+.013f*m);
+            float rx=w*(.055f+.013f*m)*(1f-.30f*pucker);
             float ry=h*(.0035f+.015f*m);
             int alpha=(int)(130f*clamp((m-.09f)*1.25f));
             cavity.setShader(new RadialGradient(x,y,Math.max(rx,ry),
