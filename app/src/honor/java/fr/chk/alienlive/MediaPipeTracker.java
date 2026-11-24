@@ -46,15 +46,17 @@ final class MediaPipeTracker implements AutoCloseable {
         f.yaw = degrees(Math.atan2(m[8],m[10]));
         f.pitch = degrees(Math.atan2(m[9],Math.hypot(m[8],m[10])));
         f.roll = -degrees(Math.atan2(m[1],m[0]));
-        float close = 0f, smileL = 0f, smileR = 0f, squintL = 0f, squintR = 0f;
+        float close = 0f, squintL = 0f, squintR = 0f;
         for (Category c : result.faceBlendshapes().get().get(0)) {
             float score = c.score();
             switch (c.categoryName()) {
                 case "jawOpen" -> f.mouth = score;
                 case "mouthClose" -> close = score;
                 case "mouthPucker", "mouthFunnel" -> f.rounded = Math.max(f.rounded,score);
-                case "mouthSmileLeft" -> smileL = score;
-                case "mouthSmileRight" -> smileR = score;
+                case "mouthSmileLeft" -> f.smileLeft = score;
+                case "mouthSmileRight" -> f.smileRight = score;
+                case "mouthLeft" -> f.slide += score;
+                case "mouthRight" -> f.slide -= score;
                 case "eyeBlinkLeft" -> f.blinkLeft = score;
                 case "eyeBlinkRight" -> f.blinkRight = score;
                 case "cheekSquintLeft" -> squintL = score;
@@ -68,14 +70,27 @@ final class MediaPipeTracker implements AutoCloseable {
         }
         // Inner lip separation keeps a clenched jaw with parted lips expressive
         // and prevents the avatar talking through sealed lips.
-        float gap = separation(points.get(13),points.get(14),input.getWidth(),input.getHeight());
+        int w=input.getWidth(), h=input.getHeight();
+        float dx=(points.get(291).x()-points.get(61).x())*w;
+        float dy=(points.get(291).y()-points.get(61).y())*h;
+        float length=Math.max(1f,(float)Math.hypot(dx,dy));
+        float nx=-dy/length, ny=dx/length;
+        float gap=.5f*lipGap(points,13,14,w,h,nx,ny)
+            +.25f*(lipGap(points,82,87,w,h,nx,ny)+lipGap(points,312,317,w,h,nx,ny));
         float span = separation(points.get(33),points.get(263),input.getWidth(),input.getHeight());
         float visible = unit((gap/Math.max(1f,span)-.009f)*4.8f);
         f.mouth = Math.min(unit(visible*1.8f),Math.max(visible,f.mouth*(1f-close)));
-        f.cheekLeft = Math.max(squintL,smileL*.55f);
-        f.cheekRight = Math.max(squintR,smileR*.55f);
-        f.smile = Math.max(smileL,smileR);
+        f.cheekLeft = Math.max(squintL,f.smileLeft*.55f);
+        f.cheekRight = Math.max(squintR,f.smileRight*.55f);
+        f.smile = Math.max(f.smileLeft,f.smileRight);
         return f;
+    }
+    private static float lipGap(List<NormalizedLandmark> points,int top,int bottom,int w,int h,float nx,float ny){
+        NormalizedLandmark a=points.get(top), b=points.get(bottom);
+        return projectedGap((b.x()-a.x())*w,(b.y()-a.y())*h,nx,ny);
+    }
+    static float projectedGap(float dx,float dy,float nx,float ny){
+        return Math.abs(dx*nx+dy*ny);
     }
     private static float separation(NormalizedLandmark a, NormalizedLandmark b,int w,int h) {
         return (float)Math.hypot((a.x()-b.x())*w,(a.y()-b.y())*h);
@@ -83,7 +98,7 @@ final class MediaPipeTracker implements AutoCloseable {
     private static float degrees(double radians){return (float)Math.toDegrees(radians);}
     private static float unit(float n){return Math.max(0f,Math.min(1f,n));}
     static final class Frame {
-        float x,y,roll,yaw,pitch,mouth,rounded,blinkLeft,blinkRight,smile,cheekLeft,cheekRight,gazeX,gazeY;
+        float x,y,roll,yaw,pitch,mouth,rounded,blinkLeft,blinkRight,smile,smileLeft,smileRight,slide,cheekLeft,cheekRight,gazeX,gazeY;
     }
     @Override public void close(){landmarker.close();}
 }

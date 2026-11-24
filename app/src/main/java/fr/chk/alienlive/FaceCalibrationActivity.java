@@ -161,12 +161,13 @@ public final class FaceCalibrationActivity extends Activity {
             @Override public void onCheeksAndLips(float left,float right,float pucker,boolean lipContours){
                 glb.setCheeksAndLips(left,right,pucker);
             }
+            @Override public void onLipCorners(float left,float right,float slide){glb.setLipCorners(left,right,slide);}
             @Override public void onFacialMeasurements(float left,float right,float mouth,float smile){
                 eyeLeftOpen=left;eyeRightOpen=right;
-                glb.setSmile(smile<0f?0f:FaceCalibration.clamp((smile-.25f)/.75f));
                 renderDiagnostics();
             }
             @Override public void onStatus(String status){
+                if(status.startsWith("Visage non détecté")){glb.clearTracking();detectedMouth=facePitch=0f;eyeLeftOpen=eyeRightOpen=-1f;}
                 faceStatus=status;renderDiagnostics();
             }
         },camera);

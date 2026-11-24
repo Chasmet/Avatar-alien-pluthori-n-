@@ -93,11 +93,17 @@ public final class FaceCalibration {
         return new float[]{mouthX,mouthY};
     }
     public float[] effectivePoint(int which){
-        float[] custom=point(which);
+        float[] result=new float[2];
+        fillEffectivePoint(which,result);
+        return result;
+    }
+    public void fillEffectivePoint(int which,float[] result){
+        float cx=which==0?leftX:which==1?rightX:mouthX;
+        float cy=which==0?leftY:which==1?rightY:mouthY;
         float dx=which==0?.375f:which==1?.625f:.50f;
         float dy=which==2?.54f:.705f;
         float weight=mode==AUTO?0f:mode==MANUAL?1f:.8f;
-        return new float[]{dx+(custom[0]-dx)*weight,dy+(custom[1]-dy)*weight};
+        result[0]=dx+(cx-dx)*weight;result[1]=dy+(cy-dy)*weight;
     }
     public void setPoint(int which,float x,float y){
         x=clamp(x);y=clamp(y);

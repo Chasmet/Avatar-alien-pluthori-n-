@@ -20,7 +20,7 @@ public final class AlienStageView extends View {
     private final PortraitAnimator portraitAnimator=new PortraitAnimator();
     private volatile float mouthOpen=0f, headYaw=0f, headPitch=0f, eyeLeft=0f, eyeRight=0f;
     private boolean mouthMeasured;
-    private float cheekLeft,cheekRight,rounded,smile;
+    private float cheekLeft,cheekRight,rounded,smileLeft,smileRight,lipSlide;
     public void setCheeksAndLips(float left,float right,float pucker,boolean lipContours){
         mouthMeasured=lipContours;
         cheekLeft=left;cheekRight=right;rounded=pucker;
@@ -31,7 +31,15 @@ public final class AlienStageView extends View {
     public void setSpokenShape(float round,float wide){
         if(round!=spokenRound||wide!=spokenWide){spokenRound=round;spokenWide=wide;postInvalidateOnAnimation();}
     }
-    public void setSmile(float value){smile=Math.max(0f,value);}
+    public void setLipCorners(float left,float right,float slide){
+        smileLeft=left;smileRight=right;lipSlide=slide;
+    }
+    public void clearTracking(){
+        faceFound=false;mouthMeasured=false;
+        headX=headY=.5f;headRoll=headPitch=headYaw=eyeLeft=eyeRight=mouthOpen=targetMouth=0f;
+        setGaze(0f,0f);setLipCorners(0f,0f,0f);setCheeksAndLips(0f,0f,0f,false);
+        postInvalidateOnAnimation();
+    }
     private float targetMouth=0f;
     private volatile float voiceMouth=0f;
     private volatile long lastFaceAt=0L;
@@ -43,6 +51,8 @@ public final class AlienStageView extends View {
     private volatile float headX=.5f,headY=.5f,headRoll=0f;
     private volatile boolean faceFound=false;
     private boolean clean=false,animate=true,saveBattery=true,show3D=false;
+    private int selectedCharacter;
+    private String selectedName;
     private int selectedScene=0, selectedMode=0,intensity=65;
     private long lastReload=0;
 
@@ -64,6 +74,9 @@ public final class AlienStageView extends View {
             ?BitmapFactory.decodeFile(AlienData.file(getContext(),false).getPath())
             :BitmapFactory.decodeResource(getResources(),AlienData.PORTRAITS[character]);
         selectedScene=scene;
+        selectedCharacter=character;
+        selectedName=character==AlienData.CUSTOM_CHARACTER&&GlbCollection.selected(getContext())!=null
+            ?GlbCollection.activeName(getContext()):AlienData.NAMES[character];
         selectedMode=AlienData.prefs(getContext()).getInt("weatherMode",0);
         intensity=AlienData.prefs(getContext()).getInt("weatherIntensity",65);
         animate=AlienData.prefs(getContext()).getBoolean("animatedWeather",true);
@@ -129,12 +142,13 @@ public final class AlienStageView extends View {
             c.scale(portrait.width()/characterBitmap.getWidth(),
                     portrait.height()/characterBitmap.getHeight());
             // Le maillage transforme la texture originale plutot qu'un point noir dessine.
-            portraitAnimator.draw(c,characterBitmap,AlienData.character(getContext()),
+            portraitAnimator.draw(c,characterBitmap,selectedCharacter,
                 animateMouth?(freshFace?(mouthMeasured?mouthOpen:Math.max(mouthOpen,voiceMouth*.70f)):voiceMouth):0f,turn,tilt,
                 animateEyes&&freshFace?eyeLeft:0f,
                 animateEyes&&freshFace?eyeRight:0f,
                 animateMouth&&freshFace?cheekLeft:0f,animateMouth&&freshFace?cheekRight:0f,
-                Math.max(animateMouth&&freshFace?rounded:0f,spokenRound),spokenWide,animateMouth&&freshFace?smile:0f,
+                Math.max(animateMouth&&freshFace?rounded:0f,spokenRound),spokenWide,animateMouth&&freshFace?smileLeft:0f,
+                animateMouth&&freshFace?smileRight:0f,animateMouth&&freshFace?lipSlide:0f,
                 animateEyes&&freshFace?gazeX:0f,animateEyes&&freshFace?gazeY:0f,
                 animateMouth||animateEyes||followHead);
             c.restore();
@@ -148,7 +162,7 @@ public final class AlienStageView extends View {
             labelPaint.setTextAlign(Paint.Align.CENTER);
             labelPaint.setTextSize(14f*getResources().getDisplayMetrics().scaledDensity);
             labelPaint.setColor(0xFFF2E9FF);
-            c.drawText((AlienData.character(getContext())==AlienData.CUSTOM_CHARACTER&&GlbCollection.selected(getContext())!=null?GlbCollection.activeName(getContext()):AlienData.NAMES[AlienData.character(getContext())]),w/2f,h-67,labelPaint);
+            c.drawText(selectedName,w/2f,h-67,labelPaint);
             labelPaint.setTextSize(11f*getResources().getDisplayMetrics().scaledDensity);
             labelPaint.setColor(0xFFE4CCE8);
             c.drawText(animate?"Atmosphère : "+atmosphere.currentWeather(selectedMode,selectedScene):"Atmosphère désactivée",w/2f,h-40,labelPaint);

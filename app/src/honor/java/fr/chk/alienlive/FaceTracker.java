@@ -43,6 +43,7 @@ public final class FaceTracker {
         default void onEngine(String name){}
         default void onExpression(float yaw,float pitch,float blinkLeft,float blinkRight){}
         default void onCheeksAndLips(float left,float right,float rounded,boolean lipContours){}
+        default void onLipCorners(float left,float right,float slide){}
         default void onFacialMeasurements(float leftEyeOpen,float rightEyeOpen,float mouth,float smile){}
     }
     private final Context context;
@@ -98,6 +99,7 @@ public final class FaceTracker {
                         listener.onGaze(f.gazeX,f.gazeY);
                         listener.onPose(clamp(f.x),clamp(f.y),f.roll,f.mouth);
                         listener.onCheeksAndLips(f.cheekLeft,f.cheekRight,f.rounded,true);
+                        listener.onLipCorners(f.smileLeft,f.smileRight,f.slide);
                         listener.onFacialMeasurements(1f-f.blinkLeft,1f-f.blinkRight,f.mouth,f.smile);
                     });
                     found(now,"MediaPipe");
@@ -141,6 +143,7 @@ public final class FaceTracker {
                 listener.onExpression(clampAngle(yaw,36f),clampAngle(pitch,28f),eyeClosed(l),eyeClosed(r));
                 listener.onPose(px,py,roll,mouth);
                 listener.onCheeksAndLips(cl,cr,round,lips);
+                listener.onLipCorners(Math.max(0f,smile),Math.max(0f,smile),0f);
                 listener.onFacialMeasurements(l,r,mouth,smile);
             });
             found(now,"ML Kit");

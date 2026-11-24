@@ -33,10 +33,11 @@ public final class VoiceEngine {
 
     private volatile Thread worker;
     private volatile WLipSync lipSync;
+    private volatile long lastAudioAt;
     private boolean playingBack;
     WLipSync.Pose lipPose(){
         WLipSync engine=lipSync;
-        return running&&engine!=null?engine.pose():WLipSync.Pose.REST;
+        return running&&engine!=null&&android.os.SystemClock.uptimeMillis()-lastAudioAt<180L?engine.pose():WLipSync.Pose.REST;
     }
     private AudioRecord input;
     private AudioTrack output;
@@ -87,6 +88,7 @@ public final class VoiceEngine {
             if(playback)output.play();
             playingBack=playback;
             WLipSync analyzer=analyzeLips?new WLipSync(SAMPLE_RATE):null;
+            lastAudioAt=0L;
             lipSync=analyzer;
             AudioRecord recorder=input;
             AudioTrack player=output;
@@ -109,7 +111,7 @@ public final class VoiceEngine {
             catch(Exception e){ if(running) state("Enregistrement interrompu");break; }
             if(count<=0){if(count<0)state("Le microphone a été interrompu");break;}
             if(!running || worker!=Thread.currentThread())break;
-            if(analyzer!=null)analyzer.accept(in,count);
+            if(analyzer!=null){analyzer.accept(in,count);lastAudioAt=android.os.SystemClock.uptimeMillis();}
             float energy=0f;
             for(int i=0;i<count;i++){
                 energy+=((float)in[i]/32768f)*((float)in[i]/32768f);

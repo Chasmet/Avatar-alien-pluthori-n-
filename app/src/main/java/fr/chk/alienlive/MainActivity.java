@@ -32,7 +32,7 @@ public final class MainActivity extends Activity {
     private TextView status,faceDiagnostics;
     private String engineName="Suivi facial";
     private float lastPitchDegrees=0f,eyeLeftOpen=-1f,eyeRightOpen=-1f,smileConfidence=-1f;
-    private long lastFaceDiagnostic=0L;
+    private long lastFaceDiagnostic=0L,lastMeasurementText=0L;
     private boolean mouthMeasured;
     private float trackedMouth=0f,lastX=.5f,lastY=.5f,lastRoll=0f;
     private long lastFaceMouthAt=0L;
@@ -44,7 +44,8 @@ public final class MainActivity extends Activity {
             FaceCalibration cal=activeCalibration;
             float voiceForGlb=cal==null?audioMouth:cal.mouth(audioMouth);
             stage.setVoiceMouth(animateLips?audioMouth:0f);
-            boolean recent=android.os.SystemClock.uptimeMillis()-lastFaceMouthAt<450L;
+            boolean recent=lastFaceMouthAt!=0 && android.os.SystemClock.uptimeMillis()-lastFaceMouthAt<450L;
+            if(!recent && lastFaceMouthAt!=0)clearFace();
             float mouth=recent?(mouthMeasured?trackedMouth:Math.max(trackedMouth,voiceForGlb*.55f)):voiceForGlb;
             float detailGain=!animateLips?0f:recent&&mouthMeasured?Math.min(1f,trackedMouth*7f)*.55f:1f;
             model3D.setSpokenShape(spoken.round*detailGain,spoken.wide*detailGain);
@@ -133,12 +134,16 @@ public final class MainActivity extends Activity {
                     model3D.setCheeksAndLips(animateLips?left:0f,animateLips?right:0f,animateLips?pucker:0f);
                 });
             }
+            @Override public void onLipCorners(float left,float right,float slide){
+                if(!animateLips){stage.setLipCorners(0f,0f,0f);model3D.setLipCorners(0f,0f,0f);return;}
+                stage.setLipCorners(left,right,slide);model3D.setLipCorners(left,right,slide);
+            }
             @Override public void onFacialMeasurements(float leftOpen,float rightOpen,float mouth,float smile){
                 runOnUiThread(()->{
                     eyeLeftOpen=leftOpen;eyeRightOpen=rightOpen;smileConfidence=smile;
-                    stage.setSmile(smile);
-                    model3D.setSmile(!animateLips||smile<0f?0f:Math.max(0f,(smile-.25f)/.75f));
-                    if(faceDiagnostics.getVisibility()==View.VISIBLE){
+                    long now=android.os.SystemClock.uptimeMillis();
+                    if(faceDiagnostics.getVisibility()==View.VISIBLE && now-lastMeasurementText>=200L){
+                        lastMeasurementText=now;
                         String left=leftOpen<0f?"N/D":Math.round(leftOpen*100f)+"%";
                         String right=rightOpen<0f?"N/D":Math.round(rightOpen*100f)+"%";
                         String smileText=smile<0f?"N/D":Math.round(smile*100f)+"%";
@@ -152,14 +157,19 @@ public final class MainActivity extends Activity {
                 runOnUiThread(()->{
                     status.setText(message);
                     if(message.startsWith("Visage non détecté")){
-                        model3D.setSmile(0f);
-                        model3D.setExpression(0f,0f,0f,0f);
+                        clearFace();
                         if(faceDiagnostics.getVisibility()==View.VISIBLE)
                             faceDiagnostics.setText("Visage non détecté : replace-toi devant la caméra");
                     }
                 });
             }
         });
+    }
+    private void clearFace(){
+        lastFaceMouthAt=0;lastX=lastY=.5f;lastRoll=trackedMouth=0f;mouthMeasured=false;
+        stage.clearTracking();model3D.clearTracking();
+        if(faceDiagnostics.getVisibility()==View.VISIBLE)
+            faceDiagnostics.setText("En attente du visage");
     }
     private void sync3DMode(){
         if(model3D==null||stage==null)return;
@@ -289,7 +299,7 @@ public final class MainActivity extends Activity {
             else {voiceRequested=false;lipOnlyRequested=false;updateAudioButtons();status.setText("Autorise le micro pour la synchronisation vocale");}
         }
     }
-    @Override protected void onPause(){lipHandler.removeCallbacks(lipTicker);tracker.stop();model3D.onPause();if(voice!=null)voice.stop();super.onPause();}
+    @Override protected void onPause(){lipHandler.removeCallbacks(lipTicker);tracker.stop();clearFace();model3D.onPause();if(voice!=null)voice.stop();super.onPause();}
     @Override protected void onDestroy(){if(voice!=null)voice.stop();super.onDestroy();}
     @Override public void onBackPressed(){if(full)setLive(false);else super.onBackPressed();}
 }

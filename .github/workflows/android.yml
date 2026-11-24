@@ -177,7 +177,7 @@ jobs:
           # Métadonnées vérifiables même si l'API GitHub omet l'attribut digest.
           SHA_HONOR=$(sha256sum "$APK" | cut -d' ' -f1)
           SHA_COMPAT=$(sha256sum "$COMPAT" | cut -d' ' -f1)
-          NOTES=$(printf 'CHK Pluthor %s : wLipSync pour les formes des lèvres au micro, suivi caméra MediaPipe.\nSignataire SHA-256 : %s\nsha256-honor=%s\nsha256-compat=%s\n' "$VERSION" "$SIGNER" "$SHA_HONOR" "$SHA_COMPAT")
+          NOTES=$(printf 'CHK Pluthor %s : sourires asymétriques, lèvres suivies sur trois zones, recentrage du visage et morphologies GLB importées.\nSignataire SHA-256 : %s\nsha256-honor=%s\nsha256-compat=%s\n' "$VERSION" "$SIGNER" "$SHA_HONOR" "$SHA_COMPAT")
           # Signature figée par le cache. Une expiration bloque la compilation.
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release upload "$TAG" "$APK" "$COMPAT" --clobber --repo "$GITHUB_REPOSITORY"

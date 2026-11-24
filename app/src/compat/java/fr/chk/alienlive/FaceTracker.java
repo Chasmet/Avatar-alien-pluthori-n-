@@ -34,6 +34,7 @@ import java.util.Arrays;
 /** Suivi facial local léger et sans API réseau. Pas de détection labiale fine. */
 public final class FaceTracker {
     public interface Listener { void onPose(float x,float y,float roll,float mouth); void onStatus(String status); default void onGaze(float x,float y){} default void onEngine(String name){} default void onExpression(float yaw,float pitch,float blinkLeft,float blinkRight){} default void onCheeksAndLips(float left,float right,float rounded,boolean lipContours){}
+        default void onLipCorners(float left,float right,float slide){}
         default void onFacialMeasurements(float leftEyeOpen,float rightEyeOpen,float mouth,float smile){} }
     private final Context context;
     private final Listener listener;

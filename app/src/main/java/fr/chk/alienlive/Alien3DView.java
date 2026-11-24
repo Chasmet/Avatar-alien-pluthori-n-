@@ -33,8 +33,8 @@ import javax.microedition.khronos.opengles.GL10;
 public final class Alien3DView extends GLSurfaceView {
     public interface Status { void onReady(); void onError(String message); }
     private final StageRenderer renderer;
-    private volatile float yaw=0f,pitch=0f,roll=0f,mouth=0f,blinkLeft=0f,blinkRight=0f,smile=0f,x=.5f,y=.5f;
-    private volatile float cheekLeft, cheekRight, rounded;
+    private volatile float yaw=0f,pitch=0f,roll=0f,mouth=0f,blinkLeft=0f,blinkRight=0f,x=.5f,y=.5f;
+    private volatile float smileLeft,smileRight,lipSlide,cheekLeft, cheekRight, rounded;
     private volatile long expressionTime;
     public void setCheeksAndLips(float left,float right,float pucker){
         cheekLeft=left; cheekRight=right; rounded=pucker;
@@ -54,7 +54,7 @@ public final class Alien3DView extends GLSurfaceView {
     private final Runnable frameTicker=new Runnable(){
         @Override public void run(){
             if(!framesActive)return;
-            requestRender();
+            if(isShown())requestRender();
             postDelayed(this,saver?50L:33L);
         }
     };
@@ -87,7 +87,17 @@ public final class Alien3DView extends GLSurfaceView {
     public void setSpokenShape(float round,float wide){
         spokenRound=round;spokenWide=wide;
     }
-    public void setSmile(float probability){smile=Math.max(0f,Math.min(1f,probability));}
+    public void setLipCorners(float left,float right,float slide){
+        smileLeft=left;smileRight=right;lipSlide=slide;
+    }
+    public void clearTracking(){
+        setPose(.5f,.5f,0f,0f);
+        yaw=pitch=blinkLeft=blinkRight=0f;
+        setLipCorners(0f,0f,0f);
+        setCheeksAndLips(0f,0f,0f);
+        setGaze(0f,0f);
+        expressionTime=-450L;
+    }
     public void setReverseVertical(boolean enabled){reverseVertical=enabled;}
     public void setFaceCalibration(FaceCalibration cal){faceCalibration=cal;requestRender();}
     /** Partage le même zoom/panoramique que FacePointsOverlay pendant la calibration.
@@ -140,7 +150,8 @@ public final class Alien3DView extends GLSurfaceView {
     private final class StageRenderer implements GLSurfaceView.Renderer {
         private final Context context;
         private final Status callback;
-        private final float[] projection=new float[16],view=new float[16],root=new float[16],tmp=new float[16],mvp=new float[16],local=new float[16];
+        private final float[] projection=new float[16],view=new float[16],root=new float[16],tmp=new float[16],mvp=new float[16],local=new float[16],vm=new float[16];
+        private final float[] le=new float[2],re=new float[2],mo=new float[2];
         private final List<Mesh> meshes=new ArrayList<>();
         private int program,positionLoc,uvLoc,mvpLoc,baseLoc,texLoc,useTexLoc,lightLoc,lipLoc;
         private int mouthMorphLoc,blinkMorphLoc,mouthMorphWeightLoc,blinkMorphWeightLoc;
@@ -151,7 +162,7 @@ public final class Alien3DView extends GLSurfaceView {
         private float centerX=0f,centerY=0f,centerZ=0f,customScale=1f;
         private float faceMinY=0f,faceWidth=1f,faceHeight=1f;
         private volatile boolean loaded;
-        private float easedYaw,easedPitch,easedRoll,easedJaw,easedBlinkL,easedBlinkR,easedSmile,easedX=.5f,easedY=.5f;
+        private float easedYaw,easedPitch,easedRoll,easedJaw,easedBlinkL,easedBlinkR,easedSmileL,easedSmileR,easedSlide,easedX=.5f,easedY=.5f;
         private int detailLoc, surfaceLoc, frontZLoc;
         private final String VERTEX="""
             attribute vec3 aPos;
@@ -159,8 +170,9 @@ public final class Alien3DView extends GLSurfaceView {
             attribute vec3 aMouthMorph;
             attribute vec3 aBlinkMorph;
             uniform mat4 uMvp;
-            uniform float uLip, uMouthWeight, uSmile, uImported, uBreath, uFrontZ;
+            uniform float uLip, uMouthWeight, uImported, uBreath, uFrontZ;
             uniform vec2 uBlinkWeight;
+            uniform vec3 uCorners;
             uniform vec2 uGaze, uHeadMotion, uMouthPoint;
             uniform vec4 uFace, uEyePoints, uDetail, uSurface;
             varying vec2 vUv;
@@ -177,6 +189,7 @@ public final class Alien3DView extends GLSurfaceView {
                 float eyeBlink=mix(uBlinkWeight.y,uBlinkWeight.x,side);
                 vec3 pos=aPos+aMouthMorph*uMouthWeight+aBlinkMorph*eyeBlink;
                 vec2 lip=uv-uMouthPoint;
+                float smile=mix(uCorners.y,uCorners.x,smoothstep(-.045,.045,lip.x));
                 float lipMask=region(lip,vec2(.17,.060));
                 float front=uSurface.x;
                 if(uImported>.5)
@@ -184,9 +197,10 @@ public final class Alien3DView extends GLSurfaceView {
                 float leftWeight=region(uv-mix(uEyePoints.zw,uMouthPoint,.48)-vec2(.055,0.),vec2(.10,.080));
                 float rightWeight=region(uv-mix(uEyePoints.xy,uMouthPoint,.48)+vec2(.055,0.),vec2(.10,.080));
                 float cheek=uDetail.x*leftWeight+uDetail.y*rightWeight;
-                pos.y+=front*scale.y*(.025*cheek+.010*uSmile*lipMask);
+                pos.y+=front*scale.y*(.025*cheek+.010*smile*lipMask);
                 pos.z+=front*scale.x*(.012*cheek+.026*uDetail.z*lipMask);
-                pos.x+=front*scale.x*lip.x*lipMask*(.18*uSmile-.43*uDetail.z+.34*uDetail.w*(1.-uDetail.z));
+                pos.x+=front*scale.x*lip.x*lipMask*(.18*smile-.43*uDetail.z+.34*uDetail.w*(1.-uDetail.z));
+                pos.x+=front*scale.x*.038*uCorners.z*lipMask;
                 vec2 dl=uv-uEyePoints.xy, dr=uv-uEyePoints.zw;
                 float le=region(dl,vec2(.095,.036)), re=region(dr,vec2(.095,.036));
                 pos.y-=front*uSurface.y*scale.y*(dl.y*le*uBlinkWeight.y+dr.y*re*uBlinkWeight.x)*1.55;
@@ -240,7 +254,7 @@ public final class Alien3DView extends GLSurfaceView {
                 detailLoc=GLES20.glGetUniformLocation(program,"uDetail");
                 surfaceLoc=GLES20.glGetUniformLocation(program,"uSurface");
                 frontZLoc=GLES20.glGetUniformLocation(program,"uFrontZ");
-                smileLoc=GLES20.glGetUniformLocation(program,"uSmile");
+                smileLoc=GLES20.glGetUniformLocation(program,"uCorners");
                 eyePointsLoc=GLES20.glGetUniformLocation(program,"uEyePoints");
                 mouthPointLoc=GLES20.glGetUniformLocation(program,"uMouthPoint");
                 lightLoc=0;
@@ -286,7 +300,9 @@ public final class Alien3DView extends GLSurfaceView {
             float blinkPulse=!tracking && (t%4.9f)>4.71f?(float)Math.sin(((t%4.9f)-4.71f)/.19f*3.1415927f):0f;
             easedBlinkL+=((eyesEnabled?(tracking?blinkLeft:blinkPulse*.93f):0f)-easedBlinkL)*.52f;
             easedBlinkR+=((eyesEnabled?(tracking?blinkRight:blinkPulse*.93f):0f)-easedBlinkR)*.52f;
-            easedSmile+=((tracking?smile:0f)-easedSmile)*.22f;
+            easedSmileL+=((tracking?smileLeft:0f)-easedSmileL)*.40f;
+            easedSmileR+=((tracking?smileRight:0f)-easedSmileR)*.40f;
+            easedSlide+=((tracking?lipSlide:0f)-easedSlide)*.50f;
             easedX+=(x-easedX)*blend;
             easedY+=(y-easedY)*blend;
             Matrix.setLookAtM(view,0,0f,0f,3.7f,0f,-.13f,0f,0f,1f,0f);
@@ -323,9 +339,11 @@ public final class Alien3DView extends GLSurfaceView {
             GLES20.glUniform4f(faceLoc,imported?centerX:0f,imported?faceMinY:-.64f,basisW,basisH);
             GLES20.glUniform1f(frontZLoc,centerZ);
             GLES20.glUniform4f(detailLoc,tracking?cheekLeft:0f,tracking?cheekRight:0f,Math.max(tracking?rounded:0f,spokenRound),spokenWide);
-            float[] le=cal==null?new float[]{.375f,.705f}:cal.effectivePoint(0);
-            float[] re=cal==null?new float[]{.625f,.705f}:cal.effectivePoint(1);
-            float[] mo=cal==null?new float[]{.50f,.54f}:cal.effectivePoint(2);
+            if(cal!=null){
+                cal.fillEffectivePoint(0,le);cal.fillEffectivePoint(1,re);cal.fillEffectivePoint(2,mo);
+            }else{
+                le[0]=.375f;re[0]=.625f;le[1]=re[1]=.705f;mo[0]=.5f;mo[1]=.54f;
+            }
             float eyeOffset=imported?0f:.055f;
             float mouthOffset=imported?0f:-.31f;
             GLES20.glUniform4f(eyePointsLoc,le[0]-eyeOffset,le[1],re[0]+eyeOffset,re[1]);
@@ -343,7 +361,7 @@ public final class Alien3DView extends GLSurfaceView {
             for(Mesh mesh:meshes){
                 boolean classic=!imported&&"pluthorien_alpha.glb".equals(activeAsset);
                 // Tous les volumes d'origine sont préservés dans le mode fidèle.
-                if(!classic&&naturalModel&&!mesh.textured&&!mesh.jaw&&!mesh.volume)continue;
+                if(!imported&&!classic&&naturalModel&&!mesh.textured&&!mesh.jaw&&!mesh.volume)continue;
                 Matrix.setIdentityM(local,0);
                 if(mesh.jaw){
                     if(classic){
@@ -362,7 +380,6 @@ public final class Alien3DView extends GLSurfaceView {
                     Matrix.scaleM(local,0,customScale,customScale,customScale);
                 }
                 Matrix.multiplyMM(tmp,0,root,0,local,0);
-                float[] vm=new float[16];
                 Matrix.multiplyMM(vm,0,view,0,tmp,0);
                 Matrix.multiplyMM(mvp,0,projection,0,vm,0);
                 GLES20.glUniformMatrix4fv(mvpLoc,1,false,mvp,0);
@@ -376,7 +393,7 @@ public final class Alien3DView extends GLSurfaceView {
                 boolean facialSurface=imported||mesh.textured;
                 GLES20.glUniform4f(surfaceLoc,facialSurface?1f:0f,mesh.blinkMorph==null?1f:0f,
                     classic&&mesh.jaw?-.3166667f/basisH:0f,0f);
-                GLES20.glUniform1f(smileLoc,easedSmile);
+                GLES20.glUniform3f(smileLoc,easedSmileL,easedSmileR,easedSlide);
                 if(mesh.openMorph!=null){
                     mesh.openMorph.position(0);
                     GLES20.glEnableVertexAttribArray(mouthMorphLoc);
@@ -480,21 +497,24 @@ public final class Alien3DView extends GLSurfaceView {
                     JSONObject attrs=primitive.getJSONObject("attributes");
                     float[] positions=readFloats(file,dataOffset,views,accessors,attrs.getInt("POSITION"),3);
                     float[] uv=attrs.has("TEXCOORD_0")?readFloats(file,dataOffset,views,accessors,attrs.getInt("TEXCOORD_0"),2):null;
-                    int[] indices=readIndices(file,dataOffset,views,accessors,primitive.getInt("indices"));
-                    JSONObject pbr=materials.getJSONObject(primitive.optInt("material",0)).getJSONObject("pbrMetallicRoughness");
-                    JSONArray colors=pbr.optJSONArray("baseColorFactor");
+                    if(primitive.optInt("mode",4)!=4)continue;
+                    int vertexCount=positions.length/3;
+                    int[] indices;
+                    if(primitive.has("indices"))indices=readIndices(file,dataOffset,views,accessors,primitive.getInt("indices"));
+                    else{
+                        indices=new int[vertexCount];
+                        for(int k=0;k<vertexCount;k++)indices[k]=k;
+                    }
+                    JSONObject material=materials==null?null:materials.optJSONObject(primitive.optInt("material",-1));
+                    JSONObject pbr=material==null?null:material.optJSONObject("pbrMetallicRoughness");
+                    JSONArray colors=pbr==null?null:pbr.optJSONArray("baseColorFactor");
                     float[] color=new float[]{1f,1f,1f,1f};
                     if(colors!=null)for(int k=0;k<4;k++)color[k]=(float)colors.getDouble(k);
-                    boolean textured=pbr.has("baseColorTexture")&&textureId!=0;
+                    boolean textured=pbr!=null&&pbr.has("baseColorTexture")&&textureId!=0&&uv!=null;
                     float[] lipDelta=null,blinkDelta=null;
-                    JSONArray targets=primitive.optJSONArray("targets");
-                    if(name.startsWith("Head_")&&targets!=null&&targets.length()>3){
-                        lipDelta=readFloats(file,dataOffset,views,accessors,
-                                targets.getJSONObject(0).getInt("POSITION"),3);
-                        blinkDelta=readFloats(file,dataOffset,views,accessors,
-                                targets.getJSONObject(3).getInt("POSITION"),3);
-                        if(lipDelta.length!=positions.length||blinkDelta.length!=positions.length)
-                            throw new IllegalArgumentException("Blendshapes du visage invalides");
+                    if(activeCustomFile!=null||name.startsWith("Head_")){
+                        lipDelta=GlbFaceTargets.read(glbMesh,primitive,true,file,dataOffset,views,accessors,vertexCount);
+                        blinkDelta=GlbFaceTargets.read(glbMesh,primitive,false,file,dataOffset,views,accessors,vertexCount);
                     }
                     if(activeCustomFile!=null){
                         if(lipDelta==null||blinkDelta==null){
@@ -511,6 +531,7 @@ public final class Alien3DView extends GLSurfaceView {
                     }
                 }
             }
+            if(meshes.isEmpty())throw new IllegalArgumentException("Aucune surface triangulaire dans le GLB");
             if(activeCustomFile!=null)finishCustomBounds();
         }
         private float minPX,maxPX,minPY,maxPY,minPZ,maxPZ;
